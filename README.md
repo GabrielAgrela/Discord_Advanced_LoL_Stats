@@ -13,12 +13,11 @@ A Discord bot that provides advanced League of Legends statistics and analytics 
 
 ## Prerequisites
 
-- Python 3.8+
-- Docker (optional, for containerized deployment)
+- Docker and Docker Compose
 - Discord Bot Token
 - Riot Games API Key
 
-## Installation
+## Installation & Setup
 
 1. Clone the repository:
 ```bash
@@ -26,18 +25,7 @@ git clone https://github.com/yourusername/Discord_Advanced_LoL_Stats.git
 cd Discord_Advanced_LoL_Stats
 ```
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up environment variables:
+2. Set up environment variables:
    - Create a `.env` file in the root directory
    - Add the following variables:
 ```env
@@ -47,15 +35,44 @@ RIOT_API_KEY=your_riot_api_key
 
 ## Running the Bot
 
-### Standard Method
-```bash
-python src/bot.py
-```
-
-### Using Docker
+### Production Mode
 ```bash
 docker-compose up -d
 ```
+
+To view logs:
+```bash
+docker-compose logs -f
+```
+
+To stop the bot:
+```bash
+docker-compose down
+```
+
+### Development/Debug Mode
+
+The bot includes a built-in debugger configuration. To use it:
+
+1. Run in debug mode:
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.debug.yml up
+```
+
+2. The debugger will be available on port 5678. You can connect to it using:
+   - VS Code's Python debugger
+   - PyCharm's Python Remote Debug
+   - Any other debugger that supports Python's debugpy
+
+3. To set breakpoints:
+   - Add `breakpoint()` in your code where you want to pause execution
+   - Or use your IDE's breakpoint interface
+
+4. When a breakpoint is hit, you can:
+   - Inspect variables
+   - Step through code
+   - Evaluate expressions
+   - View the call stack
 
 ## Commands
 
@@ -77,6 +94,7 @@ Discord_Advanced_LoL_Stats/
 │       ├── Loops.py
 │       └── RiotAPIOperations.py
 ├── docker-compose.yml
+├── docker-compose.debug.yml
 ├── Dockerfile
 └── requirements.txt
 ```

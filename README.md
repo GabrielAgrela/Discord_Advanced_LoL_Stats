@@ -78,7 +78,7 @@ docker-compose up
 - `/player_vs_player [username1] [username2] [champion] [gamemode]` - Compare two players' stats on a specific champion
 - `/player_friends_stats [username]` - View stats when playing with friends
 - `/update_database` - Update the database with new matches
-- `/add_player_to_database [username] [tagline]` - Add a new player to track (e.g., username: "sopustos", tagline: "EUW")
+- `/add_player_to_database [username] [tagline]` - Add a new player to track (e.g., username: "Felizberto", tagline: "EUW")
 
 ## Project Structure
 

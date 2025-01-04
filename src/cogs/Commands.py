@@ -10,7 +10,7 @@ class Commands(commands.Cog):
     async def get_player_stats(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        summoner_name: str = "sopustos",
+        summoner_name: str = "felizbreto",
         gamemode: str = commands.Param(default="ARAM", choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
         champion: str = commands.Param(default=None)
     ):
@@ -158,7 +158,7 @@ class Commands(commands.Cog):
         
         Parameters
         ----------
-        username: The player to add to the database. Ex: "sopustos" and the #/tagline being "EUW" 
+        username: The player to add to the database. Ex: "felizbreto" and the #/tagline being "EUW" 
         """
         if not await self.bot.is_botlol_channel(inter):
             return

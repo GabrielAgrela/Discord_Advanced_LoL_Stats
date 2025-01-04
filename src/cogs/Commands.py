@@ -118,6 +118,8 @@ class Commands(commands.Cog):
         ----------
         username: The player to look up
         """
+        if not await self.bot.is_botlol_channel(inter):
+            return
         await inter.response.defer()
         try:
             data = await asyncio.wait_for(
@@ -136,9 +138,33 @@ class Commands(commands.Cog):
         self, 
         inter: disnake.ApplicationCommandInteraction
     ):
+        """
+        Look for new matches for all players in the database and update the database
+        """
+        if not await self.bot.is_botlol_channel(inter):
+            return
         await inter.response.defer()
         await inter.followup.send(embed=disnake.Embed(title="Updating database", description=f"Updating database with {await self.bot.get_cog('RiotAPIOperations').update_database()} new matches found", color=disnake.Color.blue()))
         
+    @commands.slash_command()
+    async def add_player_to_database(
+        self, 
+        inter: disnake.ApplicationCommandInteraction,
+        username: str,
+        tagline: str
+    ):
+        """
+        Add a player to the database
+        
+        Parameters
+        ----------
+        username: The player to add to the database. Ex: "sopustos" and the #/tagline being "EUW" 
+        """
+        if not await self.bot.is_botlol_channel(inter):
+            return
+        data = await self.bot.get_cog("RiotAPIOperations").get_acc_from_riot_id(username, tagline)
+        await self.bot.get_cog("DatabaseOperations").insert_user(username, data["puuid"], data["gameName"], data["tagLine"])
+        await inter.response.send_message(f"Added {username} to the database", ephemeral=True)
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

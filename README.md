@@ -21,7 +21,7 @@ A Discord bot that provides advanced League of Legends statistics and analytics 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/Discord_Advanced_LoL_Stats.git
+git clone https://github.com/GabrielAgrela/Discord_Advanced_LoL_Stats.git
 cd Discord_Advanced_LoL_Stats
 ```
 
@@ -52,34 +52,33 @@ docker-compose down
 
 ### Development/Debug Mode
 
-The bot includes a built-in debugger configuration. To use it:
+To enable debugging:
 
-1. Run in debug mode:
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.debug.yml up
+1. In the Dockerfile, uncomment the debugging section:
+```dockerfile
+# Debugging
+# RUN pip install debugpy
+# ENTRYPOINT ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "src/bot.py"]
 ```
 
-2. The debugger will be available on port 5678. You can connect to it using:
-   - VS Code's Python debugger
-   - PyCharm's Python Remote Debug
-   - Any other debugger that supports Python's debugpy
+2. Rebuild and run the container:
+```bash
+docker-compose build
+docker-compose up
+```
 
-3. To set breakpoints:
-   - Add `breakpoint()` in your code where you want to pause execution
-   - Or use your IDE's breakpoint interface
-
-4. When a breakpoint is hit, you can:
-   - Inspect variables
-   - Step through code
-   - Evaluate expressions
-   - View the call stack
+3. The container will wait for a debugger connection on port 5678 before starting the bot
+4. Connect your IDE's debugger to localhost:5678
+5. Set breakpoints in your code and debug as needed
 
 ## Commands
 
-- `/stats [summoner_name]` - Display summoner statistics
-- `/match [summoner_name]` - Show recent match details
-- `/compare [summoner1] [summoner2]` - Compare two players' stats
-- `/track [summoner_name]` - Start tracking a player's statistics
+- `/get_player_stats [summoner_name] [gamemode] [champion]` - Display detailed stats for a summoner. Gamemode can be ARAM, CLASSIC, CHERRY, etc.
+- `/get_all_players_stats` - Show stats for all tracked players
+- `/player_vs_player [username1] [username2] [champion] [gamemode]` - Compare two players' stats on a specific champion
+- `/player_friends_stats [username]` - View stats when playing with friends
+- `/update_database` - Update the database with new matches
+- `/add_player_to_database [username] [tagline]` - Add a new player to track (e.g., username: "sopustos", tagline: "EUW")
 
 ## Project Structure
 
@@ -94,7 +93,6 @@ Discord_Advanced_LoL_Stats/
 │       ├── Loops.py
 │       └── RiotAPIOperations.py
 ├── docker-compose.yml
-├── docker-compose.debug.yml
 ├── Dockerfile
 └── requirements.txt
 ```

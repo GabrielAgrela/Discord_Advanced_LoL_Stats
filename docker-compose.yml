@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    env_file: .env
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    ports:
+      - "5678:5678"
+    restart: unless-stopped

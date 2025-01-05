@@ -6,3 +6,4 @@ requests==2.31.0
 aiohttp==3.9.1
 debugpy==1.8.0 
 asyncio
+Pillow==10.2.0

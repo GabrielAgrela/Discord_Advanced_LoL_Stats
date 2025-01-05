@@ -5,12 +5,44 @@ import asyncio
 class Commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._player_names_cache = []
+        self._last_cache_update = 0
+
+    async def _get_player_names(self):
+        # Update cache every 5 minutes
+        current_time = asyncio.get_event_loop().time()
+        if not self._player_names_cache or current_time - self._last_cache_update > 300:
+            users = await self.bot.get_cog("DatabaseOperations").get_users()
+            self._player_names_cache = [user[3] for user in users]  # username is at index 0
+            self._last_cache_update = current_time
+        return self._player_names_cache
+
+    async def player_autocomplete(self, inter: disnake.ApplicationCommandInteraction, string: str) -> list[str]:
+        """Autocomplete function for player names"""
+        try:
+            player_names = await self._get_player_names()
+            return [name for name in player_names if string.lower() in name.lower()][:25]
+        except Exception as e:
+            print(f"Error in autocomplete: {e}")
+            return []
+
+    @staticmethod
+    async def _autocomplete_wrapper(inter: disnake.ApplicationCommandInteraction, string: str) -> list[str]:
+        """Static wrapper for autocomplete to work with disnake's expectations"""
+        try:
+            cog = inter.bot.get_cog("Commands")
+            if cog:
+                return await cog.player_autocomplete(inter, string)
+            return []
+        except Exception as e:
+            print(f"Error in autocomplete wrapper: {e}")
+            return []
 
     @commands.slash_command()
     async def get_player_stats(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        summoner_name: str,
+        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
         champion: str = commands.Param(default=None)
     ):
@@ -67,10 +99,10 @@ class Commands(commands.Cog):
     async def player_vs_player(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        username1: str,
-        username2: str,
-        champion: str,
-        gamemode: str = commands.Param(default="ARAM", choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"])
+        username1: str = commands.Param(autocomplete=_autocomplete_wrapper),
+        username2: str = commands.Param(autocomplete=_autocomplete_wrapper),
+        gamemode: str = commands.Param(default="ARAM", choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        champion: str = commands.Param(default=None)
     ):
         """
         Get LoL stats for two players vs each other
@@ -79,8 +111,8 @@ class Commands(commands.Cog):
         ----------
         username1: The first player to look up
         username2: The second player to look up
-        champion: The champion to get stats for
         gamemode: The game mode to get stats for (default is ARAM)
+        champion: The champion to get stats for (optional)
         """
         if not await self.bot.is_botlol_channel(inter):
             return
@@ -109,7 +141,7 @@ class Commands(commands.Cog):
     async def player_friends_stats(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        username: str
+        username: str = commands.Param(autocomplete=_autocomplete_wrapper)
     ):
         """
         Get LoL stats for a player's friends
@@ -166,6 +198,46 @@ class Commands(commands.Cog):
         full_name = f"{data['gameName']}#{data['tagLine']}"
         await self.bot.get_cog("DatabaseOperations").insert_user(full_name, data["puuid"], data["gameName"], data["tagLine"])
         await inter.response.send_message(f"Added {full_name} to the database", ephemeral=True)
+
+    @commands.slash_command()
+    async def generate_card(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
+        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"])
+    ):
+        """
+        Generate a player card with stats
+        
+        Parameters
+        ----------
+        summoner_name: The summoner name to generate a card for
+        gamemode: The game mode to show stats for
+        """
+        if not await self.bot.is_botlol_channel(inter):
+            return
+            
+        await inter.response.defer()
+        
+        try:
+            # Get player stats
+            data = await self.bot.get_cog("DatabaseOperations").get_player_stats(summoner_name, gamemode)
+            if not data:
+                await inter.followup.send(
+                    embed=disnake.Embed(
+                        title="No stats found",
+                        description=f"No {gamemode} stats found for {summoner_name}",
+                        color=disnake.Color.red()
+                    )
+                )
+                return
+                
+            # Generate the card using CardGenerator cog
+            card_file = await self.bot.get_cog("CardGenerator").generate_player_card(summoner_name, gamemode, data)
+            await inter.followup.send(file=card_file)
+                
+        except Exception as e:
+            await inter.followup.send(f"Error generating card: {str(e)}")
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

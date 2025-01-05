@@ -288,10 +288,10 @@ class DatabaseOperations(commands.Cog):
             )
             cursor.execute(query, (username, gamemode, champion))
         else:
-            # Original behavior: show champions with 4 or more games
+            # Original behavior: show champions with 1 or more games
             query = base_query.format(
                 champion_filter="",
-                having_clause="HAVING total_games >= 4"
+                having_clause="HAVING total_games >= 1"
             )
             cursor.execute(query, (username, gamemode))
 

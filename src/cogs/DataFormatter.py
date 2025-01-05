@@ -176,7 +176,7 @@ class DataFormatter(commands.Cog):
 
     async def format_update_database_progress_message(self, game_name, match_count):
         return {
-            "title": "🎮 Database Updated",
+            "title": "🎮 Updating Database",
             "description": f"Adding {match_count} matches to the database found for {game_name}"
         }
 

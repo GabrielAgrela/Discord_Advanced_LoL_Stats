@@ -10,8 +10,8 @@ class Commands(commands.Cog):
     async def get_player_stats(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        summoner_name: str = "felizbreto",
-        gamemode: str = commands.Param(default="ARAM", choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        summoner_name: str,
+        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
         champion: str = commands.Param(default=None)
     ):
         """
@@ -144,7 +144,7 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
         await inter.response.defer()
-        await inter.followup.send(embed=disnake.Embed(title="Updating database", description=f"Updating database with {await self.bot.get_cog('RiotAPIOperations').update_database()} new matches found", color=disnake.Color.blue()))
+        await inter.followup.send(embed=disnake.Embed(title="Updated Database", description=f"Added {await self.bot.get_cog('RiotAPIOperations').update_database()} new matches", color=disnake.Color.blue()))
         
     @commands.slash_command()
     async def add_player_to_database(

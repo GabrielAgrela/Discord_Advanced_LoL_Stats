@@ -38,7 +38,7 @@ class DataFormatter(commands.Cog):
         description += f"• Total Games: {total_games}\n"
         description += f"• Unique Champions: {unique_champs}\n"
         description += f"• Champion Variety: {unique_ratio:.1f}%\n"
-        description += f"• Total Hours: {total_hours}\n"
+        description += f"• Total Hours: {int(total_hours)}\n"
         description += f"• Total Pentas: {total_pentas}\n"
         description += f"• Latest Game Fetched: {oldest_game}\n\n"
         description += table

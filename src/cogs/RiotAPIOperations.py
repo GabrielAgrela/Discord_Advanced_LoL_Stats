@@ -145,26 +145,44 @@ class RiotAPIOperations(commands.Cog):
 
         return match_data
     
-    async def update_database(self):
+    async def update_database(self, inter: disnake.ApplicationCommandInteraction = None):
         users = await self.bot.get_cog("DatabaseOperations").get_users()
         total_matches_updated = 0
+        total_users = len(users)
+
+        def create_progress_bar(current, total, width=20):
+            filled = int(width * current / total)
+            bar = "█" * filled + "░" * (width - filled)
+            percent = int(100 * current / total)
+            return f"\nProgress: [{bar}] {percent}% ({current}/{total} users)"
 
         # Get formatted message for scanning announcement
         formatted_message = await self.bot.get_cog("DataFormatter").format_update_database_scan_message(users)
+        original_description = formatted_message["description"]
+        final_description = original_description.replace("Scanning for", "Scanned")
 
+        # Store the botlol channel reference and message for later use if inter is None
+        status_channel = None
+        status_message = None
+        
         for guild in self.bot.guilds:
             channel = disnake.utils.get(guild.text_channels, name="botlol")
             if channel:
-                embed = disnake.Embed(
-                    title=formatted_message["title"],
-                    description=formatted_message["description"],
-                    color=disnake.Color.orange()
-                )
-                await channel.send(embed=embed)
+                status_channel = channel
+                if not inter and not status_message:
+                    status_message = await channel.send(embed=disnake.Embed(
+                        title="Starting database update...",
+                        description=original_description + create_progress_bar(0, total_users),
+                        color=disnake.Color.blue()
+                    ))
         
-        for user in users:
+        for i, user in enumerate(users, 1):
             riot_id = user[1].strip()
             print(f"\nProcessing player: {riot_id}")
+            
+            # Update the description to bold the current user
+            current_description = original_description.replace(f"• {riot_id}", f"-->{riot_id}")
+            current_description += create_progress_bar(i, total_users)
             
             if "#" not in riot_id:
                 print("Invalid Riot ID format. It should be gameName#tagLine.")
@@ -176,19 +194,37 @@ class RiotAPIOperations(commands.Cog):
                 
                 if not match_ids:
                     print(f"No new matches found for {riot_id}!")
+                    if inter:
+                        await inter.edit_original_message(embed=disnake.Embed(
+                            title=f"{riot_id} - No new matches",
+                            description=current_description,
+                            color=disnake.Color.blue()
+                        ))
+                    elif status_message:
+                        await status_message.edit(embed=disnake.Embed(
+                            title=f"{riot_id} - No new matches",
+                            description=current_description,
+                            color=disnake.Color.blue()
+                        ))
                 else:
                     print(f"Processing {len(match_ids)} new matches")
                     # Get formatted message for progress update
                     progress_message = await self.bot.get_cog("DataFormatter").format_update_database_progress_message(game_name, len(match_ids))
-                    for guild in self.bot.guilds:
-                        channel = disnake.utils.get(guild.text_channels, name="botlol")
-                        if channel:
-                            embed = disnake.Embed(
-                                title=progress_message["title"],
-                                description=progress_message["description"],
-                                color=disnake.Color.orange()
-                            )
-                            await channel.send(embed=embed)
+                    progress_description = progress_message["description"] + create_progress_bar(i, total_users)
+                    
+                    if inter:
+                        await inter.edit_original_message(embed=disnake.Embed(
+                            title=f"{riot_id} - Processing {len(match_ids)} matches",
+                            description=progress_description,
+                            color=disnake.Color.blue()
+                        ))
+                    elif status_message:
+                        await status_message.edit(embed=disnake.Embed(
+                            title=f"{riot_id} - Processing {len(match_ids)} matches",
+                            description=progress_description,
+                            color=disnake.Color.blue()
+                        ))
+                    
                     for m_id in match_ids:
                         match_data = await self.get_match_data(m_id)
                         if match_data:
@@ -196,7 +232,35 @@ class RiotAPIOperations(commands.Cog):
                         
             except Exception as e:
                 print(f"Error processing {riot_id}: {str(e)}")
+                if inter:
+                    await inter.edit_original_message(embed=disnake.Embed(
+                        title=f"{riot_id} - Error",
+                        description=current_description,
+                        color=disnake.Color.red()
+                    ))
+                elif status_message:
+                    await status_message.edit(embed=disnake.Embed(
+                        title=f"{riot_id} - Error",
+                        description=current_description,
+                        color=disnake.Color.red()
+                    ))
                 continue
+        
+        # Send final update
+        final_description = final_description + create_progress_bar(total_users, total_users)
+        final_color = disnake.Color.green() if total_matches_updated > 0 else disnake.Color.red()
+        if inter:
+            await inter.edit_original_message(embed=disnake.Embed(
+                title=f"Update Complete - {total_matches_updated} new matches",
+                description=final_description,
+                color=final_color
+            ))
+        elif status_message:
+            await status_message.edit(embed=disnake.Embed(
+                title=f"Update Complete - {total_matches_updated} new matches",
+                description=final_description,
+                color=final_color
+            ))
         
         return total_matches_updated
     

@@ -80,28 +80,6 @@ class Loops(commands.Cog):
                 
                 # Update database with new matches
                 num_matches_updated = await self.bot.get_cog("RiotAPIOperations").update_database()
-
-                if num_matches_updated > 0:
-                    match_count = await self.bot.get_cog("DatabaseOperations").get_match_count()
-                    for guild in self.bot.guilds:
-                        channel = disnake.utils.get(guild.text_channels, name="botlol")
-                        if channel:
-                            embed = disnake.Embed(
-                                title="🎮 Database Updated",
-                                description=f"Added {num_matches_updated} matches to the database ({match_count} total)",
-                                color=disnake.Color.green()
-                            )
-                            await channel.send(embed=embed)
-                else:
-                    for guild in self.bot.guilds:
-                        channel = disnake.utils.get(guild.text_channels, name="botlol")
-                        if channel:
-                            embed = disnake.Embed(
-                                title="🎮 Database Updated",
-                                description="No new matches found",
-                                color=disnake.Color.orange()
-                            )
-                            await channel.send(embed=embed)
                 await asyncio.sleep(200)
 
             await asyncio.sleep(10)

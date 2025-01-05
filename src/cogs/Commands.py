@@ -21,7 +21,9 @@ class Commands(commands.Cog):
         """Autocomplete function for player names"""
         try:
             player_names = await self._get_player_names()
-            return [name for name in player_names if string.lower() in name.lower()][:25]
+            filtered_names = [name for name in player_names if string.lower() in name.lower()]
+            filtered_names.sort()  # Sort alphabetically
+            return filtered_names[:25]
         except Exception as e:
             print(f"Error in autocomplete: {e}")
             return []
@@ -176,7 +178,8 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
         await inter.response.defer()
-        await inter.followup.send(embed=disnake.Embed(title="Updated Database", description=f"Added {await self.bot.get_cog('RiotAPIOperations').update_database()} new matches", color=disnake.Color.blue()))
+        total_matches = await self.bot.get_cog('RiotAPIOperations').update_database(inter)
+        #await inter.edit_original_message(embed=disnake.Embed(title="Updated Database", description=f"Added {total_matches} new matches", color=disnake.Color.blue()))
         
     @commands.slash_command()
     async def add_player_to_database(

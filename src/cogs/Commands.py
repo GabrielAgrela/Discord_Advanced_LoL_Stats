@@ -163,8 +163,9 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
         data = await self.bot.get_cog("RiotAPIOperations").get_acc_from_riot_id(username, tagline)
-        await self.bot.get_cog("DatabaseOperations").insert_user(username, data["puuid"], data["gameName"], data["tagLine"])
-        await inter.response.send_message(f"Added {username} to the database", ephemeral=True)
+        full_name = f"{data['gameName']}#{data['tagLine']}"
+        await self.bot.get_cog("DatabaseOperations").insert_user(full_name, data["puuid"], data["gameName"], data["tagLine"])
+        await inter.response.send_message(f"Added {full_name} to the database", ephemeral=True)
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

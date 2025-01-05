@@ -33,7 +33,7 @@ class Commands(commands.Cog):
                 timeout=10.0
             )
             if not data:
-                await self.send_message(title="No stats found", description=f"No {gamemode} stats found for {summoner_name} (or less than 4 games per champion)")
+                await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No {gamemode} stats found for {summoner_name} (or less than 4 games per champion)", color=disnake.Color.red()))
             else:
                 await inter.followup.send(embed=disnake.Embed(title=f"{summoner_name} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_get_player_stats(data), color=disnake.Color.blue()))
         except Exception as e:
@@ -57,7 +57,7 @@ class Commands(commands.Cog):
                 timeout=10.0
             )
             if not data:
-                await self.send_message(title="No stats found", description=f"No stats found")
+                await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No stats found"))
             else:
                 await inter.followup.send(embed=disnake.Embed(title="All Players Stats", description=await self.bot.get_cog("DataFormatter").format_get_all_players_stats(data), color=disnake.Color.blue()))
         except Exception as e:
@@ -92,14 +92,14 @@ class Commands(commands.Cog):
                 timeout=10.0
             )
             if not data_user1:
-                await self.send_message(title="No stats found", description=f"No {gamemode} stats found for {username1} (or less than 4 games per champion)")
+                await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No {gamemode} stats found for {username1} (or less than 4 games per champion)", color=disnake.Color.red()))
                 return
             data_user2 = await asyncio.wait_for(
                 self.bot.get_cog("DatabaseOperations").get_player_stats(username2, gamemode, champion),
                 timeout=10.0
             )
             if not data_user2:
-                await self.send_message(title="No stats found", description=f"No {gamemode} stats found for {username2} (or less than 4 games per champion)")
+                await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No {gamemode} stats found for {username2} (or less than 4 games per champion)", color=disnake.Color.red()))
                 return
             await inter.followup.send(embed=disnake.Embed(title=f"{username1} vs {username2} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_player_vs_player(data_user1, data_user2, username1, username2), color=disnake.Color.blue()))
         except Exception as e:
@@ -127,7 +127,7 @@ class Commands(commands.Cog):
                 timeout=10.0
             )
             if not data:
-                await self.send_message(title="No stats found", description=f"No duo stats found for {username} (minimum 5 games together required)")
+                await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No duo stats found for {username} (minimum 5 games together required)", color=disnake.Color.red()))
                 return
             await inter.followup.send(embed=disnake.Embed(title=f"{username} Friends Stats", description=await self.bot.get_cog("DataFormatter").format_player_friends_data(data, username), color=disnake.Color.blue()))
         except Exception as e:

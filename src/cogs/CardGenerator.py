@@ -11,7 +11,7 @@ import base64
 class CardGenerator(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.template_path = "/app/src/cogs/templates"
+        self.template_path = "/app/src/assets/templates"
         self.assets_path = "/app/src/assets"
         
         # Define gamemode color themes

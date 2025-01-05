@@ -69,6 +69,8 @@ class Loops(commands.Cog):
                 
                 # Find the botlol channel
                 for guild in self.bot.guilds:
+                    if guild.id != user[6]:
+                        continue
                     channel = disnake.utils.get(guild.text_channels, name="botlol")
                     if channel:
                         embed = disnake.Embed(

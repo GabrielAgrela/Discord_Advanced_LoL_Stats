@@ -8,11 +8,11 @@ class Commands(commands.Cog):
         self._player_names_cache = []
         self._last_cache_update = 0
 
-    async def _get_player_names(self):
+    async def _get_player_names(self, inter: disnake.ApplicationCommandInteraction):
         # Update cache every 5 minutes
         current_time = asyncio.get_event_loop().time()
         if not self._player_names_cache or current_time - self._last_cache_update > 300:
-            users = await self.bot.get_cog("DatabaseOperations").get_users()
+            users = await self.bot.get_cog("DatabaseOperations").get_users(inter.guild.id)
             self._player_names_cache = [user[3] for user in users]  # username is at index 0
             self._last_cache_update = current_time
         return self._player_names_cache
@@ -20,7 +20,7 @@ class Commands(commands.Cog):
     async def player_autocomplete(self, inter: disnake.ApplicationCommandInteraction, string: str) -> list[str]:
         """Autocomplete function for player names"""
         try:
-            player_names = await self._get_player_names()
+            player_names = await self._get_player_names(inter)
             filtered_names = [name for name in player_names if string.lower() in name.lower()]
             filtered_names.sort()  # Sort alphabetically
             return filtered_names[:25]

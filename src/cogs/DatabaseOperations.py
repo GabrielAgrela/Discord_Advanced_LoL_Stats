@@ -38,7 +38,10 @@ class DatabaseOperations(commands.Cog):
             username TEXT,
             puuid TEXT,
             riot_id_game_name TEXT,
-            riot_id_tagline TEXT
+            riot_id_tagline TEXT,
+            last_game_played TEXT,
+            guild_id TEXT
+            
         )
         ''')
 
@@ -415,10 +418,13 @@ class DatabaseOperations(commands.Cog):
         conn.close()
         return count
 
-    async def get_users(self):
+    async def get_users(self, guild_id = None):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM users')
+        if guild_id:
+            cursor.execute('SELECT * FROM users WHERE guild_id = ?', (guild_id,))
+        else:
+            cursor.execute('SELECT * FROM users')
         results = cursor.fetchall()
         conn.close()
         return results

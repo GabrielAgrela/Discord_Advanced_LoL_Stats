@@ -20,8 +20,12 @@
             font-family: 'Spiegel', sans-serif;
             margin: 0;
             padding: 0;
-            width: 600px;
+            width: 1500px;
+            height: 1200px;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .background-container {
             position: absolute;
@@ -42,125 +46,239 @@
             min-height: 100%;
             background-size: cover;
             background-position: center;
-            filter: brightness(0.7) contrast(1.2);
         }
         .content {
             position: relative;
             z-index: 10;
             padding: 25px;
+            width: 100%;
         }
         .card {
-            background: linear-gradient(135deg, rgba(30, 35, 40, 0.65), rgba(20, 25, 30, 0.8));
-            border-radius: 25px;
+            background: linear-gradient(135deg, 
+                rgba(30, 35, 40, 0.5), 
+                rgba(15, 18, 21, 0.7));
+            border-radius: 30px;
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            margin: 5%;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5),
+                        0 5px 15px rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
+
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -50%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.05), 
+                transparent);
+            transform: rotate(-15deg);
         }
         .card-header {
             font-family: 'BeaufortforLOL', sans-serif;
             text-align: center;
             background: transparent;
             border: none;
-            padding: 30px 20px;
+            padding: 40px 20px;
             position: relative;
         }
         .card-header h2 {
-            font-size: 42px;
+            font-size: 46px;
             margin: 0;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5),
-                         0 0 20px rgba(0, 0, 0, 0.3),
-                         0 0 30px rgba(0, 0, 0, 0.2);
-            letter-spacing: 1px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5),
+                         0 2px 20px rgba(0, 0, 0, 0.3),
+                         0 2px 30px rgba(0, 0, 0, 0.2);
+            letter-spacing: 2px;
+            font-weight: 800;
         }
         .stats-box {
-            background: linear-gradient(135deg, rgba(22, 25, 28, 0.9), rgba(15, 18, 21, 0.9));
-            border-radius: 20px;
-            padding: 25px 15px;
+            background: linear-gradient(135deg, 
+                rgba(22, 25, 28, 0.95), 
+                rgba(15, 18, 21, 0.98));
+            border-radius: 25px;
+            padding: 15px;
             text-align: center;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3),
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3),
                         inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: visible;
+            min-width: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stats-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
         }
         .stats-value {
-            font-size: 38px;
-            margin-bottom: 10px;
+            font-size: clamp(28px, 3.5vw, 42px);
+            margin-bottom: 8px;
             font-weight: bold;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            background: linear-gradient(to bottom, #fff, #a0a0a0);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(to bottom, #ffffff, #a0a0a0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            overflow: visible;
+            max-width: 100%;
+            line-height: 1.2;
         }
         .stats-label {
-            color: #8a8a8a;
-            font-size: 14px;
+            color: #9a9a9a;
+            font-size: clamp(11px, 1.1vw, 13px);
             text-transform: uppercase;
             letter-spacing: 2px;
             font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            margin-top: 4px;
         }
         .champions-table {
-            background: linear-gradient(135deg, rgba(22, 25, 28, 0.95), rgba(15, 18, 21, 0.95));
-            border-radius: 20px;
+            background: linear-gradient(135deg, 
+                rgba(22, 25, 28, 0.98), 
+                rgba(15, 18, 21, 0.98));
+            border-radius: 25px;
             padding: 25px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            margin-top: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+        }
+        .champions-table::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.1), 
+                transparent);
         }
         .table {
             color: white;
             margin-bottom: 0;
             background-color: transparent !important;
+            table-layout: fixed;
+            width: 100%;
+            border-spacing: 0;
+            border-collapse: separate;
+        }
+        .table tbody tr {
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .table tbody tr:last-child {
+            border-bottom: none;
+        }
+        .table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
         }
         .table th {
-            color: #6a6a6a;
+            color: rgba(255, 255, 255, 0.85);
             border: none;
-            padding: 15px 10px;
-            background-color: transparent !important;
-            font-size: 13px;
+            padding: 12px 4px;
+            font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: 700;
+            letter-spacing: 0px;
+            font-weight: 600;
+            position: relative;
+            background: transparent;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            text-align: center;
         }
         .table td {
-            color: #e0e0e0;
+            color: #e8e8e8;
             border: none;
-            padding: 12px 10px;
+            padding: 0px;
             vertical-align: middle;
             background-color: transparent !important;
             font-size: 15px;
-            letter-spacing: 0.5px;
-        }
-        .table tbody tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+            letter-spacing: 0.2px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            height: 64px;
         }
         .card-body {
-            padding: 0 25px 25px 25px;
+            padding: 0 30px 30px 30px;
         }
         h4.theme-primary {
             font-family: 'BeaufortforLOL', sans-serif;
-            font-size: 28px;
-            margin: 30px 0 20px 0;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            letter-spacing: 1px;
+            font-size: 36px;
+            margin: 0px 0 20px 0;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5),
+                         0 2px 20px rgba(0, 0, 0, 0.3);
+            letter-spacing: 2px;
             position: relative;
             display: inline-block;
+            font-weight: 800;
+            background: linear-gradient(to bottom, #ffffff, #c0c0c0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .heading-wrapper {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
         }
         h4.theme-primary::after {
             content: '';
             position: absolute;
-            bottom: -8px;
+            bottom: -12px;
             left: 0;
             width: 100%;
-            height: 2px;
+            height: 3px;
             background: linear-gradient(90deg, 
                 transparent, 
-                currentColor, 
+                currentColor 20%, 
+                currentColor 80%, 
                 transparent);
-            opacity: 0.5;
+            opacity: 0.3;
+        }
+        .champion-img {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            margin-right: 12px;
+            vertical-align: middle;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .champion-name {
+            display: inline-block;
+            vertical-align: middle;
+            max-width: calc(100% - 60px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -176,19 +294,25 @@
             </div>
             <div class="card-body">
                 <div class="row mb-4">
-                    <div class="col-4">
+                    <div class="col-3">
                         <div class="stats-box">
                             <div class="stats-value theme-primary">{{total_games}}</div>
                             <div class="stats-label">Games</div>
                         </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
+                        <div class="stats-box">
+                            <div class="stats-value" style="color: rgb{{total_winrate_color}}">{{total_winrate}}%</div>
+                            <div class="stats-label">Win Rate</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
                         <div class="stats-box">
                             <div class="stats-value theme-primary">{{total_hours}}h</div>
                             <div class="stats-label">Played</div>
                         </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
                         <div class="stats-box">
                             <div class="stats-value theme-primary">{{total_pentas}}</div>
                             <div class="stats-label">Pentas</div>
@@ -196,30 +320,92 @@
                     </div>
                 </div>
                 
-                <h4 class="theme-primary">Top Champions</h4>
-                <div class="champions-table">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th style="width: 43%">Champion</th>
-                                <th style="width: 17%">Games</th>
-                                <th style="width: 17%">Pentas</th>
-                                <th style="width: 15%">Win%</th>
-                                <th style="width: 10%">KDA</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for champ in champions %}
-                            <tr>
-                                <td>{{champ.name}}</td>
-                                <td>{{champ.games}}</td>
-                                <td>{{champ.pentas}}</td>
-                                <td style="color: rgb{{champ.winrate_color}}">{{champ.winrate}}%</td>
-                                <td style="color: rgb{{champ.kda_color}}">{{champ.kda}}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="heading-wrapper">
+                            <h4 class="theme-primary">Top Champions</h4>
+                        </div>
+                        <div class="champions-table">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 34%; text-align: left !important;">Champion</th>
+                                        <th>Games</th>
+                                        <th>Win%</th>
+                                        <th>KDA</th>
+                                        <th>DMG/m</th>
+                                        <th>Dead%</th>
+                                        <th>Pentas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for champ in champions[:10] %}
+                                    <tr>
+                                        <td style="text-align: left !important;">
+                                            <img src="data:image/jpeg;base64,{{champ.image}}" class="champion-img" alt="{{champ.name}}">
+                                            <span class="champion-name">{{champ.name}}</span>
+                                        </td>
+                                        <td>{{champ.games}}</td>
+                                        <td style="color: rgb{{champ.winrate_color}}">{{champ.winrate}}%</td>
+                                        <td style="color: rgb{{champ.kda_color}}">{{champ.kda}}</td>
+                                        <td>{{champ.damage_per_min}}</td>
+                                        <td>{{champ.avg_time_dead_pct}}</td>
+                                        <td>{{champ.pentas}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="heading-wrapper">
+                            <h4 class="theme-primary">Performance Highlights</h4>
+                        </div>
+                        <div class="champions-table">
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="stats-box mb-3" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].max_killing_spree}}</div>
+                                        <div class="stats-label">Best Killing Spree</div>
+                                    </div>
+                                    <div class="stats-box mb-3" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].max_kda}}</div>
+                                        <div class="stats-label">Best KDA</div>
+                                    </div>
+                                    <div class="stats-box" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].total_first_bloods}}</div>
+                                        <div class="stats-label">First Bloods</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stats-box mb-3" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].total_objectives}}</div>
+                                        <div class="stats-label">Objectives Taken</div>
+                                    </div>
+                                    <div class="stats-box mb-3" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].avg_vision_score}}</div>
+                                        <div class="stats-label">Avg Vision Score</div>
+                                    </div>
+                                    <div class="stats-box" style="height: 110px;">
+                                        <div class="stats-value theme-primary">{{champions[0].avg_kill_participation}}%</div>
+                                        <div class="stats-label">Kill Participation</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="stats-box mb-3" style="height: 140px;">
+                                        <div class="stats-value theme-primary">{{champions[0].avg_gold_per_min}}</div>
+                                        <div class="stats-label">Gold per Minute</div>
+                                    </div>
+                                    <div class="stats-box" style="height: 140px;">
+                                        <div class="stats-value theme-primary">{{champions[0].avg_damage_taken_per_min}}</div>
+                                        <div class="stats-label">Damage Taken per Minute</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

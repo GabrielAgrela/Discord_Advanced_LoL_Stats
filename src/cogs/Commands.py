@@ -1,6 +1,8 @@
 from disnake.ext import commands
 import disnake
 import asyncio
+from typing import List, Optional
+from ..models.models import User, PlayerStats, PlayerFriendStats
 
 class Commands(commands.Cog):
     def __init__(self, bot):
@@ -8,16 +10,16 @@ class Commands(commands.Cog):
         self._player_names_cache = []
         self._last_cache_update = 0
 
-    async def _get_player_names(self, inter: disnake.ApplicationCommandInteraction):
+    async def _get_player_names(self, inter: disnake.ApplicationCommandInteraction) -> List[str]:
         # Update cache every 5 minutes
         current_time = asyncio.get_event_loop().time()
         if not self._player_names_cache or current_time - self._last_cache_update > 300:
-            users = await self.bot.get_cog("DatabaseOperations").get_users(inter.guild.id)
-            self._player_names_cache = [user[3] for user in users]  # username is at index 0
+            users: List[User] = await self.bot.get_cog("DatabaseOperations").get_users(inter.guild.id)
+            self._player_names_cache = [user.riot_id_game_name for user in users]
             self._last_cache_update = current_time
         return self._player_names_cache
 
-    async def player_autocomplete(self, inter: disnake.ApplicationCommandInteraction, string: str) -> list[str]:
+    async def player_autocomplete(self, inter: disnake.ApplicationCommandInteraction, string: str) -> List[str]:
         """Autocomplete function for player names"""
         try:
             player_names = await self._get_player_names(inter)
@@ -29,7 +31,7 @@ class Commands(commands.Cog):
             return []
 
     @staticmethod
-    async def _autocomplete_wrapper(inter: disnake.ApplicationCommandInteraction, string: str) -> list[str]:
+    async def _autocomplete_wrapper(inter: disnake.ApplicationCommandInteraction, string: str) -> List[str]:
         """Static wrapper for autocomplete to work with disnake's expectations"""
         try:
             cog = inter.bot.get_cog("Commands")
@@ -46,7 +48,17 @@ class Commands(commands.Cog):
         inter: disnake.ApplicationCommandInteraction,
         summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
-        champion: str = commands.Param(default=None)
+        champion: str = commands.Param(default=None),
+        sort_by: str = commands.Param(
+            choices=["champion_games", "winrate", "kda", "dpm", "time_dead", "pentas"],
+            default="champion_games",
+            description="Sort results by this stat"
+        ),
+        sort_order: str = commands.Param(
+            choices=["ASC", "DESC"],
+            default="DESC",
+            description="Sort order (ascending or descending)"
+        )
     ):
         """
         Get LoL stats for a summoner
@@ -56,14 +68,22 @@ class Commands(commands.Cog):
         summoner_name: The summoner name to look up
         gamemode: The game mode to get stats for
         champion: The champion to get stats for if you want to filter by a specific champion
+        sort_by: Sort results by this stat (games, winrate, kda, dpm, time dead, or pentas)
+        sort_order: Sort order (ascending or descending)
         """
         if not await self.bot.is_botlol_channel(inter):
             return
             
         await inter.response.defer()
         try:
-            data = await asyncio.wait_for(
-                self.bot.get_cog("DatabaseOperations").get_player_stats(summoner_name, gamemode, champion),
+            data: List[PlayerStats] = await asyncio.wait_for(
+                self.bot.get_cog("DatabaseOperations").get_player_stats(
+                    summoner_name, 
+                    gamemode, 
+                    champion,
+                    sort_by=sort_by,
+                    sort_order=sort_order
+                ),
                 timeout=10.0
             )
             if not data:
@@ -86,7 +106,7 @@ class Commands(commands.Cog):
             
         await inter.response.defer()
         try:
-            data = await asyncio.wait_for(
+            data: List[User] = await asyncio.wait_for(
                 self.bot.get_cog("DatabaseOperations").get_all_players_stats(),
                 timeout=10.0
             )
@@ -98,12 +118,12 @@ class Commands(commands.Cog):
             await inter.followup.send(f"Some error occurred: {e}")
 
     @commands.slash_command()
-    async def player_vs_player(
+    async def compare_players(
         self, 
         inter: disnake.ApplicationCommandInteraction,
         username1: str = commands.Param(autocomplete=_autocomplete_wrapper),
         username2: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(default="ARAM", choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
         champion: str = commands.Param(default=None)
     ):
         """
@@ -121,21 +141,21 @@ class Commands(commands.Cog):
         
         await inter.response.defer()
         try:
-            data_user1 = await asyncio.wait_for(
-                self.bot.get_cog("DatabaseOperations").get_player_stats(username1, gamemode, champion),
+            data_user1: List[PlayerStats] = await asyncio.wait_for(
+                self.bot.get_cog("DatabaseOperations").get_player_stats(username1, gamemode, champion, limit=300),
                 timeout=10.0
             )
             if not data_user1:
                 await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No {gamemode} stats found for {username1} (or less than 4 games per champion)", color=disnake.Color.red()))
                 return
-            data_user2 = await asyncio.wait_for(
-                self.bot.get_cog("DatabaseOperations").get_player_stats(username2, gamemode, champion),
+            data_user2: List[PlayerStats] = await asyncio.wait_for(
+                self.bot.get_cog("DatabaseOperations").get_player_stats(username2, gamemode, champion, limit=300),
                 timeout=10.0
             )
             if not data_user2:
                 await inter.followup.send(embed=disnake.Embed(title="No stats found", description=f"No {gamemode} stats found for {username2} (or less than 4 games per champion)", color=disnake.Color.red()))
                 return
-            await inter.followup.send(embed=disnake.Embed(title=f"{username1} vs {username2} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_player_vs_player(data_user1, data_user2, username1, username2), color=disnake.Color.blue()))
+            await inter.followup.send(embed=disnake.Embed(title=f"{username1} vs {username2} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_player_vs_player(data_user1, data_user2, username1, username2, champion), color=disnake.Color.blue()))
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
 
@@ -156,7 +176,7 @@ class Commands(commands.Cog):
             return
         await inter.response.defer()
         try:
-            data = await asyncio.wait_for(
+            data: List[PlayerFriendStats] = await asyncio.wait_for(
                 self.bot.get_cog("DatabaseOperations").get_player_friend_stats(username),
                 timeout=10.0
             )
@@ -178,7 +198,7 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
         await inter.response.defer()
-        total_matches = await self.bot.get_cog('RiotAPIOperations').update_database(inter)
+        total_matches = await self.bot.get_cog('RiotAPIOperations').update_database(inter=inter, announce=True)
         #await inter.edit_original_message(embed=disnake.Embed(title="Updated Database", description=f"Added {total_matches} new matches", color=disnake.Color.blue()))
         
     @commands.slash_command()
@@ -199,7 +219,7 @@ class Commands(commands.Cog):
             return
         data = await self.bot.get_cog("RiotAPIOperations").get_acc_from_riot_id(username, tagline)
         full_name = f"{data['gameName']}#{data['tagLine']}"
-        await self.bot.get_cog("DatabaseOperations").insert_user(full_name, data["puuid"], data["gameName"], data["tagLine"])
+        await self.bot.get_cog("DatabaseOperations").insert_user(full_name, data["puuid"], data["gameName"], data["tagLine"], inter)
         await inter.response.send_message(f"Added {full_name} to the database", ephemeral=True)
 
     @commands.slash_command()
@@ -207,7 +227,17 @@ class Commands(commands.Cog):
         self,
         inter: disnake.ApplicationCommandInteraction,
         summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"])
+        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        sort_by: str = commands.Param(
+            choices=["champion games", "winrate", "kda", "dpm", "time dead", "pentas"],
+            default="champion games",
+            description="Sort results by this stat"
+        ),
+        sort_order: str = commands.Param(
+            choices=["ASC", "DESC"],
+            default="DESC",
+            description="Sort order (ascending or descending)"
+        )
     ):
         """
         Generate a player card with stats
@@ -224,7 +254,12 @@ class Commands(commands.Cog):
         
         try:
             # Get player stats
-            data = await self.bot.get_cog("DatabaseOperations").get_player_stats(summoner_name, gamemode)
+            data: List[PlayerStats] = await self.bot.get_cog("DatabaseOperations").get_player_stats(
+                summoner_name, 
+                gamemode, 
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
             if not data:
                 await inter.followup.send(
                     embed=disnake.Embed(
@@ -241,6 +276,20 @@ class Commands(commands.Cog):
                 
         except Exception as e:
             await inter.followup.send(f"Error generating card: {str(e)}")
+
+    @commands.slash_command()
+    async def populate_champions_table(
+        self,
+        inter: disnake.ApplicationCommandInteraction
+    ):
+        """
+        DEBUG: Populate the champions table with data from Data Dragon API
+
+        """
+        # this will take a while like 5 minutes
+        await inter.response.send_message("Populating champions table, this will take a while...", ephemeral=True)
+        await self.bot.get_cog("RiotAPIOperations").populate_champions_table()
+        await inter.edit_original_message(content="Champions table populated", embed=None)
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

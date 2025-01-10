@@ -29,7 +29,7 @@ class LoLStatsBot(commands.InteractionBot):
         for guild in self.guilds:
             if not any(channel.name == "botlol" for channel in guild.text_channels):
                 await guild.create_text_channel("botlol")
-        await self.get_cog("Loops").check_if_in_game()
+       # await self.get_cog("Loops").check_if_in_game()
 
     async def on_guild_join(self, guild: disnake.Guild):
         """Create botlol channel when bot joins a new guild"""

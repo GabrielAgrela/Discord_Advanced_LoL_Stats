@@ -49,3 +49,4 @@ docker-compose.override.yml
 # Discord bot specific
 config.json
 token.txt 
+src/assets/gamedata/*

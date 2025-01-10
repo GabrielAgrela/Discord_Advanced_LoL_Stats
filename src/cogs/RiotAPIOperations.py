@@ -7,6 +7,8 @@ import disnake
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+from typing import List, Optional, Dict, Any
+from ..models.models import User, Match, Participant
 
 class RiotAPIOperations(commands.Cog):
     def __init__(self, bot, account_region="euw1", match_region="europe"):
@@ -41,11 +43,13 @@ class RiotAPIOperations(commands.Cog):
             if len(self.short_window) >= 19:  # Leave room for buffer
                 sleep_time = 1 - (current_time - self.short_window[0]) + buffer_time
                 if sleep_time > 0:
+                    print(f"Sleeping for {sleep_time} seconds")
                     await asyncio.sleep(sleep_time)
                     
             if len(self.long_window) >= 99:  # Leave room for buffer
                 sleep_time = 120 - (current_time - self.long_window[0]) + buffer_time
                 if sleep_time > 0:
+                    print(f"Sleeping for {sleep_time} seconds")
                     await asyncio.sleep(sleep_time)
             
             # Add current request timestamp
@@ -53,7 +57,7 @@ class RiotAPIOperations(commands.Cog):
             self.short_window.append(current_time)
             self.long_window.append(current_time)
 
-    async def make_request(self, url, params=None, max_retries=3):
+    async def make_request(self, url: str, params: Optional[Dict[str, Any]] = None, max_retries: int = 3) -> Optional[Dict[str, Any]]:
         """Helper function to make rate-limited requests with retry logic"""
         headers = {"X-Riot-Token": self.API_KEY}
         
@@ -78,7 +82,7 @@ class RiotAPIOperations(commands.Cog):
             # If we've exhausted all retries
             response.raise_for_status()
 
-    async def get_acc_from_riot_id(self, game_name, tag_line):
+    async def get_acc_from_riot_id(self, game_name: str, tag_line: str) -> Optional[Dict[str, Any]]:
         """
         Get the player's PUUID from their Riot ID (gameName#tagLine).
         Endpoint: /riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}
@@ -86,12 +90,12 @@ class RiotAPIOperations(commands.Cog):
         url = f"https://{self.MATCH_REGION}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
         return await self.make_request(url)
     
-    async def get_current_game(self, puuid):
+    async def get_current_game(self, puuid: str) -> Optional[Dict[str, Any]]:
         url = f"https://{self.ACCOUNT_REGION}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/{puuid}"
         data = await self.make_request(url)
         return data
     
-    async def get_match_ids(self, puuid, deep_fetch=False):
+    async def get_match_ids(self, puuid: str, deep_fetch: bool = False) -> List[str]:
         """
         Get match IDs for a player.
         Args:
@@ -128,29 +132,37 @@ class RiotAPIOperations(commands.Cog):
                 print(f"Skipping to next user.")
                 return new_match_ids
             
-
             start += chunk_size
         
         return new_match_ids
 
-    async def get_match_data(self, match_id):
+    async def get_match_data(self, match_id: str) -> Optional[Dict[str, Any]]:
         url = f"https://{self.MATCH_REGION}.api.riotgames.com/lol/match/v5/matches/{match_id}"
-        headers = {"X-Riot-Token": self.API_KEY}
-        match_data = await self.make_request(url, headers)        
-        # Store the match data in the database
-        await self.bot.get_cog("DatabaseOperations").insert_match(match_data)
-
-        #print id of the match
-        print(f"Match ID: {match_id}")
-
-        return match_data
+        match_data = await self.make_request(url)
+        if match_data:
+            # Convert match data to Match model
+            match = Match(
+                match_id=match_data['metadata']['matchId'],
+                game_duration=match_data['info']['gameDuration'],
+                game_version=match_data['info']['gameVersion'],
+                game_mode=match_data['info']['gameMode'],
+                game_type=match_data['info']['gameType'],
+                game_creation=str(match_data['info']['gameCreation']),
+                game_end=str(match_data['info']['gameEndTimestamp'])
+            )
+            
+            # Store the match data in the database
+            await self.bot.get_cog("DatabaseOperations").insert_match(match_data)
+            print(f"Match ID: {match_id}")
+            return match_data
+        return None
     
-    async def update_database(self, inter: disnake.ApplicationCommandInteraction = None):
-        users = await self.bot.get_cog("DatabaseOperations").get_users()
+    async def update_database(self, inter: disnake.ApplicationCommandInteraction = None, announce: bool = False) -> int:
+        users: List[User] = await self.bot.get_cog("DatabaseOperations").get_users(active="TRUE")
         total_matches_updated = 0
         total_users = len(users)
 
-        def create_progress_bar(current, total, width=20):
+        def create_progress_bar(current: int, total: int, width: int = 20) -> str:
             filled = int(width * current / total)
             bar = "█" * filled + "░" * (width - filled)
             percent = int(100 * current / total)
@@ -169,7 +181,7 @@ class RiotAPIOperations(commands.Cog):
             channel = disnake.utils.get(guild.text_channels, name="botlol")
             if channel:
                 status_channel = channel
-                if not inter and not status_message:
+                if not inter and not status_message and announce:
                     status_message = await channel.send(embed=disnake.Embed(
                         title="Starting database update...",
                         description=original_description + create_progress_bar(0, total_users),
@@ -177,53 +189,50 @@ class RiotAPIOperations(commands.Cog):
                     ))
         
         for i, user in enumerate(users, 1):
-            riot_id = user[1].strip()
+            riot_id = f"{user.riot_id_game_name}#{user.riot_id_tagline}"
             print(f"\nProcessing player: {riot_id}")
             
             # Update the description to bold the current user
-            current_description = original_description.replace(f"• {riot_id}", f"-->{riot_id}")
+            current_description = original_description.replace(f"• {user.riot_id_game_name}", f"-->{riot_id}")
             current_description += create_progress_bar(i, total_users)
-            
-            if "#" not in riot_id:
-                print("Invalid Riot ID format. It should be gameName#tagLine.")
-                continue
                 
             try:
-                game_name, tag_line = riot_id.split("#", 1)
-                match_ids = await self.get_match_ids(user[2])
+                match_ids = await self.get_match_ids(user.puuid)
                 
                 if not match_ids:
                     print(f"No new matches found for {riot_id}!")
-                    if inter:
-                        await inter.edit_original_message(embed=disnake.Embed(
-                            title=f"{riot_id} - No new matches",
-                            description=current_description,
-                            color=disnake.Color.blue()
-                        ))
-                    elif status_message:
-                        await status_message.edit(embed=disnake.Embed(
-                            title=f"{riot_id} - No new matches",
-                            description=current_description,
-                            color=disnake.Color.blue()
-                        ))
+                    if announce:
+                        if inter:
+                            await inter.edit_original_message(embed=disnake.Embed(
+                                title=f"{riot_id} - No new matches",
+                                description=current_description,
+                                color=disnake.Color.blue()
+                            ))
+                        elif status_message:
+                            await status_message.edit(embed=disnake.Embed(
+                                title=f"{riot_id} - No new matches",
+                                description=current_description,
+                                color=disnake.Color.blue()
+                            ))
                 else:
                     print(f"Processing {len(match_ids)} new matches")
                     # Get formatted message for progress update
-                    progress_message = await self.bot.get_cog("DataFormatter").format_update_database_progress_message(game_name, len(match_ids))
+                    progress_message = await self.bot.get_cog("DataFormatter").format_update_database_progress_message(user.riot_id_game_name, len(match_ids))
                     progress_description = progress_message["description"] + create_progress_bar(i, total_users)
                     
-                    if inter:
-                        await inter.edit_original_message(embed=disnake.Embed(
-                            title=f"{riot_id} - Processing {len(match_ids)} matches",
-                            description=progress_description,
-                            color=disnake.Color.blue()
-                        ))
-                    elif status_message:
-                        await status_message.edit(embed=disnake.Embed(
-                            title=f"{riot_id} - Processing {len(match_ids)} matches",
-                            description=progress_description,
-                            color=disnake.Color.blue()
-                        ))
+                    if announce:
+                        if inter:
+                            await inter.edit_original_message(embed=disnake.Embed(
+                                title=f"{riot_id} - Processing {len(match_ids)} matches",
+                                description=current_description,
+                                color=disnake.Color.blue()
+                            ))
+                        elif status_message:
+                            await status_message.edit(embed=disnake.Embed(
+                                title=f"{riot_id} - Processing {len(match_ids)} matches",
+                                description=current_description,
+                                color=disnake.Color.blue()
+                            ))
                     
                     for m_id in match_ids:
                         match_data = await self.get_match_data(m_id)
@@ -232,38 +241,137 @@ class RiotAPIOperations(commands.Cog):
                         
             except Exception as e:
                 print(f"Error processing {riot_id}: {str(e)}")
-                if inter:
-                    await inter.edit_original_message(embed=disnake.Embed(
-                        title=f"{riot_id} - Error",
-                        description=current_description,
-                        color=disnake.Color.red()
-                    ))
-                elif status_message:
-                    await status_message.edit(embed=disnake.Embed(
-                        title=f"{riot_id} - Error",
-                        description=current_description,
-                        color=disnake.Color.red()
-                    ))
                 continue
         
         # Send final update
         final_description = final_description + create_progress_bar(total_users, total_users)
         final_color = disnake.Color.green() if total_matches_updated > 0 else disnake.Color.red()
-        if inter:
-            await inter.edit_original_message(embed=disnake.Embed(
-                title=f"Update Complete - {total_matches_updated} new matches",
-                description=final_description,
-                color=final_color
-            ))
-        elif status_message:
-            await status_message.edit(embed=disnake.Embed(
-                title=f"Update Complete - {total_matches_updated} new matches",
-                description=final_description,
-                color=final_color
-            ))
+        if announce:
+            if inter:
+                message = await inter.edit_original_message(embed=disnake.Embed(
+                    title=f"Update Complete - {total_matches_updated} new matches",
+                    description=final_description,
+                    color=final_color
+                ))
+                await asyncio.sleep(60)
+                await inter.delete_original_message()
+            elif status_message:
+                await status_message.edit(embed=disnake.Embed(
+                    title=f"Update Complete - {total_matches_updated} new matches",
+                    description=final_description,
+                    color=final_color
+                ))
+                await asyncio.sleep(60)
+                await status_message.delete()
         
         return total_matches_updated
     
+    async def download_game_data(self, version: str) -> None:
+        """
+        Downloads and extracts game data for a specific version.
+        Args:
+            version: The game version (e.g., '15.1.1')
+        """
+        import shutil
+        import tarfile
+        import aiofiles
+        import os
+
+        # Create gamedata directory if it doesn't exist
+        gamedata_path = Path(__file__).parent.parent / 'assets' / 'gamedata'
+        gamedata_path.mkdir(parents=True, exist_ok=True)
+
+        # Clean existing contents
+        if gamedata_path.exists():
+            shutil.rmtree(gamedata_path)
+            gamedata_path.mkdir(parents=True)
+
+        # Download the file
+        url = f"https://ddragon.leagueoflegends.com/cdn/dragontail-{version}.tgz"
+        tgz_path = gamedata_path / f"dragontail-{version}.tgz"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    async with aiofiles.open(tgz_path, 'wb') as f:
+                        await f.write(await response.read())
+
+                    # Extract the contents
+                    with tarfile.open(tgz_path, 'r:gz') as tar:
+                        tar.extractall(path=gamedata_path)
+
+                    # Delete the tgz file
+                    tgz_path.unlink()
+                else:
+                    print(f"Failed to download game data. Status: {response.status}")
+
+    async def get_versions(self) -> List[str]:
+        url = "https://ddragon.leagueoflegends.com/api/versions.json"
+        data = await self.make_request(url)
+        return data if data else []  # Return empty list if data is None
+
+    async def populate_champions_table(self) -> int:
+        """
+        Fetches champion data from Data Dragon API and populates the champions table.
+        Returns the number of champions added/updated.
+        """
+        versions = await self.get_versions()
+        if not versions:
+            print("Error fetching version data")
+            return 0
+        
+        await self.download_game_data(versions[0])
+
+        url = f"https://ddragon.leagueoflegends.com/cdn/{versions[0]}/data/en_US/champion.json"
+        champions_data = []
+
+        try:
+            data = await self.make_request(url)
+            if not data:
+                print("Error fetching champion data")
+                return 0
+                
+            # Process each champion's data
+            for champ_key, champ_data in data['data'].items():
+                stats = champ_data['stats']
+                champion = {
+                    'id': int(champ_data['key']),
+                    'name': champ_data['name'],
+                    'title': champ_data['title'],
+                    'image_full': champ_data['image']['full'],
+                    'image_sprite': champ_data['image']['sprite'],
+                    'image_group': champ_data['image']['group'],
+                    'tags': ','.join(champ_data['tags']),
+                    'partype': champ_data['partype'],
+                    'stats_hp': stats['hp'],
+                    'stats_hpperlevel': stats['hpperlevel'],
+                    'stats_mp': stats['mp'],
+                    'stats_mpperlevel': stats['mpperlevel'],
+                    'stats_movespeed': stats['movespeed'],
+                    'stats_armor': stats['armor'],
+                    'stats_armorperlevel': stats['armorperlevel'],
+                    'stats_spellblock': stats['spellblock'],
+                    'stats_spellblockperlevel': stats['spellblockperlevel'],
+                    'stats_attackrange': stats['attackrange'],
+                    'stats_hpregen': stats['hpregen'],
+                    'stats_hpregenperlevel': stats['hpregenperlevel'],
+                    'stats_mpregen': stats['mpregen'],
+                    'stats_mpregenperlevel': stats['mpregenperlevel'],
+                    'stats_crit': stats['crit'],
+                    'stats_critperlevel': stats['critperlevel'],
+                    'stats_attackdamage': stats['attackdamage'],
+                    'stats_attackdamageperlevel': stats['attackdamageperlevel'],
+                    'stats_attackspeedperlevel': stats['attackspeedperlevel'],
+                    'stats_attackspeed': stats['attackspeed']
+                }
+                champions_data.append(champion)
+
+            # Insert the processed data into the database
+            return await self.bot.get_cog("DatabaseOperations").insert_champions(champions_data)
+
+        except Exception as e:
+            print(f"Error in populate_champions_table: {e}")
+            return 0
 
 def setup(bot):
     bot.add_cog(RiotAPIOperations(bot))

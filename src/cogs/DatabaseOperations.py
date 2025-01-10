@@ -2,239 +2,36 @@ import sqlite3
 from datetime import datetime
 import os
 from disnake.ext import commands
-
 import aiohttp
+from typing import List, Optional, Set
+from ..models.models import Match, Participant, User, PlayerStats, PlayerFriendStats, UserStats
 
 DB_PATH = "/app/data/lol_stats.db"
-# Use this path when creating your SQLite connection
 
 class DatabaseOperations(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../database/lol_database.db'))
-        #self.create_database()
 
-    def create_database(self):
+    async def get_player_stats(self, username, gamemode, champion=None, limit=200, sort_by="champion games", sort_order="DESC") -> List[PlayerStats]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Create matches table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS matches (
-            match_id TEXT PRIMARY KEY,
-            game_duration INTEGER,
-            game_version TEXT,
-            game_mode TEXT,
-            game_type TEXT,
-            game_creation TIMESTAMP,
-            game_end TIMESTAMP
-        )
-        ''')
+        # Define valid sort columns and their SQL expressions
+        sort_columns = {
+            "champion games": "total_games",
+            "winrate": "winrate",
+            "kda": "average_kda",
+            "dpm": "avg_damage_per_minute",
+            "time dead": "avg_time_dead_pct",
+            "pentas": "total_pentas"
+        }
 
-        # Create users table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            puuid TEXT,
-            riot_id_game_name TEXT,
-            riot_id_tagline TEXT,
-            last_game_played TEXT,
-            guild_id TEXT
-            
-        )
-        ''')
-
-        # Create participants table with all the relevant fields
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS participants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            match_id TEXT,
-            puuid TEXT,
-            summoner_name TEXT,
-            champion_name TEXT,
-            champion_id INTEGER,
-            team_id INTEGER,
-            team_position TEXT,
-            individual_position TEXT,
-            lane TEXT,
-            role TEXT,
-            wins BOOLEAN,
-            
-            -- Combat stats
-            kills INTEGER,
-            deaths INTEGER,
-            assists INTEGER,
-            kda REAL,
-            kill_participation REAL,
-            champion_level INTEGER,
-            vision_score INTEGER,
-            
-            -- Damage stats
-            total_damage_dealt INTEGER,
-            total_damage_to_champions INTEGER,
-            physical_damage_to_champions INTEGER,
-            magic_damage_to_champions INTEGER,
-            true_damage_to_champions INTEGER,
-            total_damage_taken INTEGER,
-            
-            -- Economy stats
-            gold_earned INTEGER,
-            gold_spent INTEGER,
-            total_minions_killed INTEGER,
-            
-            -- Vision stats
-            vision_wards_bought INTEGER,
-            sight_wards_bought INTEGER,
-            wards_placed INTEGER,
-            wards_killed INTEGER,
-            
-            -- Game progression
-            champion_experience INTEGER,
-            time_played INTEGER,
-            total_time_spent_dead INTEGER,
-            
-            -- Items
-            item0 INTEGER,
-            item1 INTEGER,
-            item2 INTEGER,
-            item3 INTEGER,
-            item4 INTEGER,
-            item5 INTEGER,
-            item6 INTEGER,
-            
-            -- Additional Combat Stats
-            bounty_level INTEGER,
-            killing_sprees INTEGER,
-            largest_killing_spree INTEGER,
-            largest_multi_kill INTEGER,
-            longest_time_spent_living INTEGER,
-            double_kills INTEGER,
-            triple_kills INTEGER,
-            quadra_kills INTEGER,
-            penta_kills INTEGER,
-            unreal_kills INTEGER,
-            
-            -- Damage Breakdown
-            damage_dealt_to_buildings INTEGER,
-            damage_dealt_to_objectives INTEGER,
-            damage_dealt_to_turrets INTEGER,
-            damage_self_mitigated INTEGER,
-            largest_critical_strike INTEGER,
-            
-            -- Objective Stats
-            inhibitor_kills INTEGER,
-            inhibitor_takedowns INTEGER,
-            inhibitors_lost INTEGER,
-            nexus_kills INTEGER,
-            nexus_lost INTEGER,
-            nexus_takedowns INTEGER,
-            turret_kills INTEGER,
-            turret_takedowns INTEGER,
-            turrets_lost INTEGER,
-            
-            -- Additional Game Stats
-            champion_transform INTEGER,
-            consumables_purchased INTEGER,
-            items_purchased INTEGER,
-            neutral_minions_killed INTEGER,
-            total_ally_jungle_minions_killed INTEGER,
-            total_enemy_jungle_minions_killed INTEGER,
-            total_time_cc_dealt INTEGER,
-            total_units_healed INTEGER,
-            
-            -- Team Stats
-            first_blood_assist BOOLEAN,
-            first_blood_kill BOOLEAN,
-            first_tower_assist BOOLEAN,
-            first_tower_kill BOOLEAN,
-            game_ended_in_surrender BOOLEAN,
-            game_ended_in_early_surrender BOOLEAN,
-            team_early_surrendered BOOLEAN,
-            
-            -- Ability Usage
-            spell1_casts INTEGER,
-            spell2_casts INTEGER,
-            spell3_casts INTEGER,
-            spell4_casts INTEGER,
-            summoner1_casts INTEGER,
-            summoner2_casts INTEGER,
-            summoner1_id INTEGER,
-            summoner2_id INTEGER,
-            
-            -- Additional Healing/Shielding Stats
-            total_heal INTEGER,
-            total_heals_on_teammates INTEGER,
-            total_damage_shielded_on_teammates INTEGER,
-            
-            -- Ping Stats
-            all_in_pings INTEGER,
-            assist_me_pings INTEGER,
-            basic_pings INTEGER,
-            command_pings INTEGER,
-            danger_pings INTEGER,
-            enemy_missing_pings INTEGER,
-            enemy_vision_pings INTEGER,
-            get_back_pings INTEGER,
-            hold_pings INTEGER,
-            need_vision_pings INTEGER,
-            on_my_way_pings INTEGER,
-            push_pings INTEGER,
-            retreat_pings INTEGER,
-            vision_cleared_pings INTEGER,
-            
-            -- Player Info
-            summoner_level INTEGER,
-            riot_id_game_name TEXT,
-            riot_id_tagline TEXT,
-            profile_icon INTEGER,
-            last_game_played TEXT,
-            
-            FOREIGN KEY (match_id) REFERENCES matches (match_id),
-            UNIQUE(match_id, puuid)
-        )
-        ''')
-
-        # Create champions table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS champions (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            title TEXT,
-            image_full TEXT,
-            image_sprite TEXT,
-            image_group TEXT,
-            tags TEXT,  -- Stored as comma-separated values
-            partype TEXT,  -- Mana, Energy, etc.
-            stats_hp REAL,
-            stats_hpperlevel REAL,
-            stats_mp REAL,
-            stats_mpperlevel REAL,
-            stats_movespeed REAL,
-            stats_armor REAL,
-            stats_armorperlevel REAL,
-            stats_spellblock REAL,
-            stats_spellblockperlevel REAL,
-            stats_attackrange REAL,
-            stats_hpregen REAL,
-            stats_hpregenperlevel REAL,
-            stats_mpregen REAL,
-            stats_mpregenperlevel REAL,
-            stats_crit REAL,
-            stats_critperlevel REAL,
-            stats_attackdamage REAL,
-            stats_attackdamageperlevel REAL,
-            stats_attackspeedperlevel REAL,
-            stats_attackspeed REAL
-        )
-        ''')
-
-        conn.commit()
-        conn.close()
-
-    async def get_player_stats(self, username, gamemode, champion=None):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        # Validate and get sort column
+        sort_column = sort_columns.get(sort_by, "total_games")
+        
+        # Validate sort order
+        sort_order = "DESC" if sort_order.upper() not in ["ASC", "DESC"] else sort_order.upper()
 
         base_query = '''
         WITH base_data AS (
@@ -251,16 +48,46 @@ class DatabaseOperations(commands.Cog):
                 COUNT(*) as total_games,
                 ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) as winrate,
                 ROUND(AVG(total_damage_to_champions / (game_duration / 60.0)), 0) as avg_damage_per_minute,
-                ROUND(AVG(kda), 2) as average_kda,
+                ROUND(AVG(CASE 
+                    WHEN deaths = 0 THEN kills + assists 
+                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
+                END), 2) as average_kda,
                 ROUND(AVG(CAST(kills AS FLOAT)), 1) as avg_kills,
                 ROUND(AVG(CAST(deaths AS FLOAT)), 1) as avg_deaths,
                 ROUND(AVG(CAST(assists AS FLOAT)), 1) as avg_assists,
                 SUM(triple_kills) as total_triples,
                 SUM(quadra_kills) as total_quadras,
-                SUM(penta_kills) as total_pentas
+                SUM(penta_kills) as total_pentas,
+                ROUND(AVG(CAST(total_time_spent_dead AS FLOAT) / game_duration * 100), 1) as avg_time_dead_pct,
+                ROUND(AVG(vision_score), 1) as avg_vision_score,
+                ROUND(AVG(kill_participation * 100), 1) as avg_kill_participation,
+                ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as avg_damage_taken_per_min,
+                SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as total_first_bloods,
+                SUM(turret_takedowns + inhibitor_takedowns) as total_objectives,
+                ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as avg_gold_per_min,
+                MAX(largest_killing_spree) as max_killing_spree,
+                MAX(CASE 
+                    WHEN deaths = 0 THEN kills + assists 
+                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
+                END) as max_kda
             FROM base_data
             GROUP BY champion_name
             {having_clause}
+        ),
+        overall_stats AS (
+            SELECT 
+                ROUND(AVG(kill_participation * 100), 1) as overall_kill_participation,
+                MAX(largest_killing_spree) as overall_max_killing_spree,
+                SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as overall_first_bloods,
+                SUM(turret_takedowns + inhibitor_takedowns) as overall_objectives,
+                ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as overall_gold_per_min,
+                ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as overall_damage_taken_per_min,
+                MAX(CASE 
+                    WHEN deaths = 0 THEN kills + assists 
+                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
+                END) as overall_max_kda,
+                ROUND(AVG(vision_score), 1) as overall_vision_score
+            FROM base_data
         )
         SELECT 
             champion_name,
@@ -277,32 +104,74 @@ class DatabaseOperations(commands.Cog):
             total_triples,
             total_quadras,
             total_pentas,
-            (SELECT SUM(penta_kills) FROM base_data) as total_pentas_overall
+            (SELECT SUM(penta_kills) FROM base_data) as total_pentas_overall,
+            (SELECT ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) FROM base_data) as total_winrate,
+            avg_time_dead_pct,
+            (SELECT overall_vision_score FROM overall_stats) as avg_vision_score,
+            (SELECT overall_kill_participation FROM overall_stats) as avg_kill_participation,
+            (SELECT overall_damage_taken_per_min FROM overall_stats) as avg_damage_taken_per_min,
+            (SELECT overall_first_bloods FROM overall_stats) as total_first_bloods,
+            (SELECT overall_objectives FROM overall_stats) as total_objectives,
+            (SELECT overall_gold_per_min FROM overall_stats) as avg_gold_per_min,
+            (SELECT overall_max_killing_spree FROM overall_stats) as max_killing_spree,
+            (SELECT overall_max_kda FROM overall_stats) as max_kda
         FROM champion_stats
-        ORDER BY champion_games DESC, winrate DESC
-        LIMIT 20;
+        ORDER BY {sort_column} {sort_order}, champion_games DESC
+        LIMIT ?;
         '''
 
         if champion:
             # If champion is specified, filter for that champion and remove the HAVING clause
             query = base_query.format(
                 champion_filter="AND LOWER(p.champion_name) = LOWER(?)",
-                having_clause=""
+                having_clause="",
+                sort_column=sort_column,
+                sort_order=sort_order
             )
-            cursor.execute(query, (username, gamemode, champion))
+            cursor.execute(query, (username, gamemode, champion, limit))
         else:
             # Original behavior: show champions with 1 or more games
             query = base_query.format(
                 champion_filter="",
-                having_clause="HAVING total_games >= 1"
+                having_clause="HAVING total_games >= 1",
+                sort_column=sort_column,
+                sort_order=sort_order
             )
-            cursor.execute(query, (username, gamemode))
+            cursor.execute(query, (username, gamemode, limit))
 
         results = cursor.fetchall()
         conn.close()
-        return results
+        player_stats = []
+        for row in results:
+            player_stats.append(PlayerStats(
+                champion_name=row[0],
+                champion_games=row[1],
+                winrate=row[2],
+                avg_damage_per_minute=row[3],
+                average_kda=row[4],
+                total_games_overall=row[5],
+                unique_champions_played=row[6],
+                unique_champ_ratio=row[7],
+                oldest_game=row[8],
+                total_hours_played=row[9],
+                total_triples=row[10],
+                total_quadras=row[11],
+                total_pentas=row[12],
+                total_pentas_overall=row[13],
+                total_winrate=row[14],
+                avg_time_dead_pct=row[15],
+                avg_vision_score=row[16],
+                avg_kill_participation=row[17],
+                avg_damage_taken_per_min=row[18],
+                total_first_bloods=row[19],
+                total_objectives=row[20],
+                avg_gold_per_min=row[21],
+                max_killing_spree=row[22],
+                max_kda=row[23]
+            ))
+        return player_stats
 
-    async def get_all_players_stats(self):
+    async def get_all_players_stats(self) -> List[UserStats]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -350,9 +219,20 @@ class DatabaseOperations(commands.Cog):
         cursor.execute(query)
         results = cursor.fetchall()
         conn.close()
-        return results
+        
+        return [UserStats(
+            riot_id_game_name=row[0],
+            riot_id_tagline=row[1],
+            total_hours_played=row[2],
+            total_hours_2024=row[3],
+            games_played=row[4],
+            avg_minutes_per_game=row[5],
+            first_game_date=row[6],
+            total_pentas=row[7],
+            winrate=row[8]
+        ) for row in results]
 
-    async def get_player_friend_stats(self, username):
+    async def get_player_friend_stats(self, username) -> List[PlayerFriendStats]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -390,10 +270,15 @@ class DatabaseOperations(commands.Cog):
         cursor.execute(query, (username, username))
         results = cursor.fetchall()
         conn.close()
-        return results
+        
+        return [PlayerFriendStats(
+            teammate_name=row[0],
+            games_together=row[1],
+            wins_together=row[2],
+            win_rate=row[3]
+        ) for row in results]
 
-    async def get_stored_match_ids(self, puuid):
-        """Get all match IDs stored in the database for a specific puuid and matches with 0 duration"""
+    async def get_stored_match_ids(self, puuid) -> Set[str]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -409,8 +294,7 @@ class DatabaseOperations(commands.Cog):
         conn.close()
         return stored_matches
 
-    async def get_match_count(self):
-        """Get the total number of matches stored in the database"""
+    async def get_match_count(self) -> int:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM matches')
@@ -418,28 +302,39 @@ class DatabaseOperations(commands.Cog):
         conn.close()
         return count
 
-    async def get_users(self, guild_id = None):
+    async def get_users(self, guild_id = None, active = False) -> List[User]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         if guild_id:
-            cursor.execute('SELECT * FROM users WHERE guild_id = ?', (guild_id,))
+            cursor.execute('SELECT id, username, puuid, riot_id_game_name, riot_id_tagline, guild_id, active, last_game_played FROM users WHERE guild_id = ?', (guild_id,))
+        elif active:
+            cursor.execute('SELECT id, username, puuid, riot_id_game_name, riot_id_tagline, guild_id, active, last_game_played FROM users WHERE active = ?', (active,))
         else:
-            cursor.execute('SELECT * FROM users')
+            cursor.execute('SELECT id, username, puuid, riot_id_game_name, riot_id_tagline, guild_id, active, last_game_played FROM users')
         results = cursor.fetchall()
         conn.close()
-        return results
-    
-    async def get_champion(self, id):
+        
+        return [User(
+            id=row[0],
+            username=row[1],
+            puuid=row[2],
+            riot_id_game_name=row[3],
+            riot_id_tagline=row[4],
+            guild_id=row[5],
+            active=bool(row[6]),
+            last_game_played=row[7]
+        ) for row in results]
+
+    async def get_champion(self, id) -> Optional[str]:
         url = "https://ddragon.leagueoflegends.com/cdn/14.24.1/data/en_US/champion.json"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 data = await response.json()
-                # Search through champions to find matching ID
                 for champ_name, champ_data in data['data'].items():
                     if int(champ_data['key']) == id:
                         return champ_data['name']
         return None
-    
+
     async def insert_match(self, match_data):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -630,18 +525,116 @@ class DatabaseOperations(commands.Cog):
         conn.commit()
         conn.close()
 
-    async def insert_user(self, username, puuid, riot_id_game_name, riot_id_tagline):
+    async def insert_user(self, username, puuid, riot_id_game_name, riot_id_tagline, inter, active = "TRUE"):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        guild_id = inter.guild.id
         
         cursor.execute('''
         INSERT OR REPLACE INTO users (
-            username, puuid, riot_id_game_name, riot_id_tagline
-        ) VALUES (?, ?, ?, ?)
-        ''', (username, puuid, riot_id_game_name, riot_id_tagline))
+            username, puuid, riot_id_game_name, riot_id_tagline, guild_id, active
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (username, puuid, riot_id_game_name, riot_id_tagline, guild_id, active))
         
         conn.commit()
         conn.close()
+    
+    async def insert_champions(self, champions_data: List[dict]) -> int:
+        """
+        Insert or update champion data in the database.
+        Args:
+            champions_data: List of dictionaries containing champion data with the following structure:
+                {
+                    'id': int,
+                    'name': str,
+                    'title': str,
+                    'image_full': str,
+                    'image_sprite': str,
+                    'image_group': str,
+                    'tags': str,  # Comma-separated values
+                    'partype': str,
+                    'stats_hp': float,
+                    'stats_hpperlevel': float,
+                    'stats_mp': float,
+                    'stats_mpperlevel': float,
+                    'stats_movespeed': float,
+                    'stats_armor': float,
+                    'stats_armorperlevel': float,
+                    'stats_spellblock': float,
+                    'stats_spellblockperlevel': float,
+                    'stats_attackrange': float,
+                    'stats_hpregen': float,
+                    'stats_hpregenperlevel': float,
+                    'stats_mpregen': float,
+                    'stats_mpregenperlevel': float,
+                    'stats_crit': float,
+                    'stats_critperlevel': float,
+                    'stats_attackdamage': float,
+                    'stats_attackdamageperlevel': float,
+                    'stats_attackspeedperlevel': float,
+                    'stats_attackspeed': float
+                }
+        Returns:
+            Number of champions added/updated
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        champions_added = 0
+
+        try:
+            for champion in champions_data:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO champions (
+                        id, name, title, image_full, image_sprite, image_group,
+                        tags, partype, stats_hp, stats_hpperlevel, stats_mp,
+                        stats_mpperlevel, stats_movespeed, stats_armor,
+                        stats_armorperlevel, stats_spellblock,
+                        stats_spellblockperlevel, stats_attackrange,
+                        stats_hpregen, stats_hpregenperlevel, stats_mpregen,
+                        stats_mpregenperlevel, stats_crit, stats_critperlevel,
+                        stats_attackdamage, stats_attackdamageperlevel,
+                        stats_attackspeedperlevel, stats_attackspeed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    champion['id'],
+                    champion['name'],
+                    champion['title'],
+                    champion['image_full'],
+                    champion['image_sprite'],
+                    champion['image_group'],
+                    champion['tags'],
+                    champion['partype'],
+                    champion['stats_hp'],
+                    champion['stats_hpperlevel'],
+                    champion['stats_mp'],
+                    champion['stats_mpperlevel'],
+                    champion['stats_movespeed'],
+                    champion['stats_armor'],
+                    champion['stats_armorperlevel'],
+                    champion['stats_spellblock'],
+                    champion['stats_spellblockperlevel'],
+                    champion['stats_attackrange'],
+                    champion['stats_hpregen'],
+                    champion['stats_hpregenperlevel'],
+                    champion['stats_mpregen'],
+                    champion['stats_mpregenperlevel'],
+                    champion['stats_crit'],
+                    champion['stats_critperlevel'],
+                    champion['stats_attackdamage'],
+                    champion['stats_attackdamageperlevel'],
+                    champion['stats_attackspeedperlevel'],
+                    champion['stats_attackspeed']
+                ))
+                champions_added += 1
+
+            conn.commit()
+            return champions_added
+        except Exception as e:
+            print(f"Error inserting champions: {e}")
+            return 0
+        finally:
+            conn.close()
 
     async def update_user(self, username, puuid = None, riot_id_game_name = None, riot_id_tagline = None, last_game_played = None):
         conn = sqlite3.connect(self.db_path)
@@ -671,5 +664,7 @@ class DatabaseOperations(commands.Cog):
         conn.commit()
         conn.close()
     
+    
+
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

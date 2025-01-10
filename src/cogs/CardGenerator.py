@@ -7,6 +7,8 @@ from playwright.async_api import async_playwright
 import jinja2
 import io
 import base64
+from typing import List
+from ..models.models import PlayerStats
 
 class CardGenerator(commands.Cog):
     def __init__(self, bot):
@@ -59,7 +61,7 @@ class CardGenerator(commands.Cog):
             autoescape=True
         )
             
-    def get_winrate_color(self, winrate):
+    def get_winrate_color(self, winrate: float) -> tuple[int, int, int]:
         """Return RGB color tuple based on winrate percentage"""
         if winrate <= 40:
             return (255, 0, 0)
@@ -77,7 +79,7 @@ class CardGenerator(commands.Cog):
                 red = int(255 * (1 - (t2 * t2)))
                 return (red, green, 0)
 
-    def get_kda_color(self, kda, theme):
+    def get_kda_color(self, kda: float, theme: dict) -> tuple[int, int, int]:
         """Return RGB color tuple based on KDA value"""
         t = min(kda, 6.0) / 6.0
         
@@ -88,28 +90,47 @@ class CardGenerator(commands.Cog):
             t2 = (t - 0.5) * 2
             return (int(255 * (1 - t2)), 255, 0)
 
-    async def generate_player_card(self, summoner_name: str, gamemode: str, data: list) -> disnake.File:
+    async def generate_player_card(self, summoner_name: str, gamemode: str, data: List[PlayerStats]) -> disnake.File:
         """Generate a player card as an image file"""
         # Prepare template data
         theme = self.gamemode_themes.get(gamemode, self.gamemode_themes["CLASSIC"])
         
-        total_games = data[0][5]
-        total_hours = data[0][9]
-        total_pentas = data[0][13]
+        first_stat = data[0]
+        total_games = first_stat.total_games_overall
+        total_hours = first_stat.total_hours_played
+        total_pentas = first_stat.total_pentas_overall
+        total_winrate = first_stat.total_winrate
         
         # Prepare champion data
         champions = []
-        for row in data[:10]:
-            winrate = row[2]
-            kda = row[4]
+        for stat in data[:10]:  # Only show top 5 champions
+            winrate = stat.winrate
+            kda = stat.average_kda
+            
+            # Read and encode champion image
+            champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "tiles", f"{stat.champion_name}_0.jpg")
+            with open(champion_image_path, "rb") as image_file:
+                encoded_champion_image = base64.b64encode(image_file.read()).decode()
+            
             champions.append({
-                'name': row[0][:15],
-                'games': row[1],
-                'pentas': row[12],
+                'name': stat.champion_name[:15],
+                'games': stat.champion_games,
+                'pentas': stat.total_pentas,
+                'damage_per_min': f"{stat.avg_damage_per_minute:.0f}",
+                'avg_time_dead_pct': f"{stat.avg_time_dead_pct:.1f}%",
                 'winrate': f"{winrate:.1f}",
                 'winrate_color': self.get_winrate_color(winrate),
                 'kda': f"{kda:.2f}",
-                'kda_color': self.get_kda_color(kda, theme)
+                'kda_color': self.get_kda_color(kda, theme),
+                'image': encoded_champion_image,
+                'max_killing_spree': stat.max_killing_spree,
+                'max_kda': f"{stat.max_kda:.1f}",
+                'total_first_bloods': stat.total_first_bloods,
+                'total_objectives': stat.total_objectives,
+                'avg_vision_score': f"{stat.avg_vision_score:.1f}",
+                'avg_kill_participation': f"{stat.avg_kill_participation:.1f}",
+                'avg_gold_per_min': f"{stat.avg_gold_per_min:.0f}",
+                'avg_damage_taken_per_min': f"{stat.avg_damage_taken_per_min:.0f}"
             })
         
         # Read and encode background image
@@ -126,6 +147,7 @@ class CardGenerator(commands.Cog):
             total_games=total_games,
             total_hours=int(total_hours),
             total_pentas=total_pentas,
+            total_winrate=total_winrate,
             champions=champions,
             background_image=encoded_image
         )
@@ -140,11 +162,8 @@ class CardGenerator(commands.Cog):
             # Wait for background image and fonts to load
             await page.wait_for_timeout(500)
             
-            # Get the actual content height
-            content_height = await page.evaluate('document.body.scrollHeight')
-            
             # Resize viewport to match content
-            await page.set_viewport_size({'width': 600, 'height': content_height})
+            await page.set_viewport_size({'width': 1500, 'height': 1200})
             
             # Take screenshot of the entire content
             screenshot = await page.screenshot()

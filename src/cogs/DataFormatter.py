@@ -1,33 +1,38 @@
 from datetime import datetime
 from disnake.ext import commands
+from typing import List
+from ..models.models import PlayerStats, PlayerFriendStats, User, UserStats
 
 class DataFormatter(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def format_get_player_stats(self, data):
+    async def format_get_player_stats(self, data: List[PlayerStats]) -> str:
+        if not data:
+            return "No data available."
+            
         # Get overall stats from the first row
-        total_games = data[0][5]
-        unique_champs = data[0][6]
-        unique_ratio = data[0][7]
-        oldest_game = datetime.strptime(data[0][8], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d')
-        total_hours = data[0][9]
-        total_pentas = data[0][13]
+        first_stat = data[0]
+        total_games = first_stat.total_games_overall
+        unique_champs = first_stat.unique_champions_played
+        unique_ratio = first_stat.unique_champ_ratio
+        oldest_game = first_stat.oldest_game
+        total_hours = first_stat.total_hours_played
+        total_pentas = first_stat.total_pentas_overall
 
         # Create the stats table with wider columns
         table = "```\nChampion Stats:\n"
         table += f"{'Champion':<15} {'Games':<8} {'Win%':<8} {'DPM':<8} {'KDA':<5} {'x4':<2} {'x5':<2}\n"
         table += "-" * 55 + "\n"  # Increased separator length
         
-        for row in data:
-            champ = row[0][:14] if "Strawberry_" not in row[0] else row[0].replace("Strawberry_", "")[:14]
-            games = str(row[1])
-            winrate = f"{row[2]:.1f}"
-            dpm = str(int(row[3]))
-            kda = f"{row[4]:.2f}"
-            quadras = str(row[11])
-            pentas = str(row[12])
-
+        for stat in data:
+            champ = stat.champion_name[:14] if "Strawberry_" not in stat.champion_name else stat.champion_name.replace("Strawberry_", "")[:14]
+            games = str(stat.champion_games)
+            winrate = f"{stat.winrate:.1f}"
+            dpm = str(int(stat.avg_damage_per_minute))
+            kda = f"{stat.average_kda:.2f}"
+            quadras = str(stat.total_quadras)
+            pentas = str(stat.total_pentas)
             
             table += f"{champ:<15} {games:<8} {winrate:<8} {dpm:<8} {kda:<5} {quadras:2} {pentas:2}\n"
         
@@ -45,20 +50,21 @@ class DataFormatter(commands.Cog):
 
         return description
     
-    async def format_get_all_players_stats(self, data):
-         # Create the stats table
+    async def format_get_all_players_stats(self, data: List[UserStats]) -> str:
+        # Create the stats table
         table = "```\nPlayer Time Stats:\n"
         table += f"{'Player':<15} {'Hours':<6} {'2024h':<6} {'Games':<5} {' WR':<4} {'Avg(m)':<8} {'Pentas':<5}\n"
         table += "-" * 55 + "\n"
         
-        for row in data:
-            name = f"{row[0]}"[:14] 
-            total_hours = f"{row[2]:.1f}"
-            hours_2024 = f"{row[3]:.1f}"
-            games = str(row[4])
-            avg_minutes = f"{row[5]:.1f}"
-            pentas = str(row[7])  # New field for pentakills
-            winrate = f"{row[8]:.1f}"
+        for user in data:
+            name = user.riot_id_game_name[:14]
+            total_hours = f"{user.total_hours_played:.1f}"
+            hours_2024 = f"{user.total_hours_2024:.1f}"
+            games = str(user.games_played)
+            avg_minutes = f"{user.avg_minutes_per_game:.1f}"
+            pentas = str(user.total_pentas)
+            winrate = f"{user.winrate:.1f}"
+            
             table += f"{name:<15} {total_hours:<6} {hours_2024:<6} {games:<5} {winrate:<4} {avg_minutes:<8} {pentas:5}\n"
         
         table += "```"
@@ -69,43 +75,77 @@ class DataFormatter(commands.Cog):
 
         return description
     
-    async def format_player_vs_player(self, data_user1, data_user2, username1, username2):
-        # Get overall stats from the first row for both players
-        total_games1, total_hours1 = data_user1[0][5], data_user1[0][9]
-        total_games2, total_hours2 = data_user2[0][5], data_user2[0][9]
+    async def format_player_vs_player(self, data_user1: List[PlayerStats], data_user2: List[PlayerStats], username1: str, username2: str, champion: str = None) -> str:
+        if not data_user1 or not data_user2:
+            return "No data available for one or both players."
 
-        # Create dictionaries of champion stats
-        champ_dict1 = {row[0]: row[1:] for row in data_user1}
-        champ_dict2 = {row[0]: row[1:] for row in data_user2}
-        all_champs = sorted(set(list(champ_dict1.keys()) + list(champ_dict2.keys())))
+        # Get overall stats from the first row for both players
+        first_stat1 = data_user1[0]
+        first_stat2 = data_user2[0]
+        total_games1, total_hours1 = first_stat1.total_games_overall, first_stat1.total_hours_played
+        total_games2, total_hours2 = first_stat2.total_games_overall, first_stat2.total_hours_played
 
         # Create the table header
         table = "```\n"
         table += f"{'Stat':<20} {username1:<15} {username2:<15}\n"
         table += "-" * 50 + "\n"
 
-        # Add champion stats
-        for champ in all_champs:            
-            # Get stats for both players
-            stats1 = champ_dict1.get(champ, [0] * 13)  # Updated to match new column count
-            stats2 = champ_dict2.get(champ, [0] * 13)  # Updated to match new column count
-            
-            if stats1[0] > 0 or stats2[0] > 0:  # Only show if either player has games
-                table += f"{'Games':<20} {stats1[0]:<15} {stats2[0]:<15}\n"
-                table += f"{'Total Hours':<20} {total_hours1:<15.1f} {total_hours2:<15.1f}\n"
-                table += f"{'Win Rate %':<20} {stats1[1]:<15.1f} {stats2[1]:<15.1f}\n"
-                table += f"{'DPM':<20} {int(stats1[2]):<15} {int(stats2[2]):<15}\n"
-                table += f"{'KDA':<20} {stats1[3]:<15.2f} {stats2[3]:<15.2f}\n"
-                table += f"{'Triple Kills':<20} {stats1[9]:<15} {stats2[9]:<15}\n"
-                table += f"{'Quadra Kills':<20} {stats1[10]:<15} {stats2[10]:<15}\n"
-                table += f"{'Penta Kills':<20} {stats1[11]:<15} {stats2[11]:<15}\n"
-                table += "\n"
+        if champion:
+            # Find champion-specific stats for both players
+            champ_stats1 = next((stat for stat in data_user1 if stat.champion_name == champion), None)
+            champ_stats2 = next((stat for stat in data_user2 if stat.champion_name == champion), None)
+
+            if champ_stats1 or champ_stats2:
+                # Use champion-specific stats
+                games1 = champ_stats1.champion_games if champ_stats1 else 0
+                games2 = champ_stats2.champion_games if champ_stats2 else 0
+                winrate1 = champ_stats1.winrate if champ_stats1 else 0
+                winrate2 = champ_stats2.winrate if champ_stats2 else 0
+                dpm1 = champ_stats1.avg_damage_per_minute if champ_stats1 else 0
+                dpm2 = champ_stats2.avg_damage_per_minute if champ_stats2 else 0
+                kda1 = champ_stats1.average_kda if champ_stats1 else 0
+                kda2 = champ_stats2.average_kda if champ_stats2 else 0
+                triples1 = champ_stats1.total_triples if champ_stats1 else 0
+                triples2 = champ_stats2.total_triples if champ_stats2 else 0
+                quadras1 = champ_stats1.total_quadras if champ_stats1 else 0
+                quadras2 = champ_stats2.total_quadras if champ_stats2 else 0
+                pentas1 = champ_stats1.total_pentas if champ_stats1 else 0
+                pentas2 = champ_stats2.total_pentas if champ_stats2 else 0
+
+                table += f"Champion Stats for {champion}:\n"
+        else:
+            # Use overall stats
+            games1, games2 = total_games1, total_games2
+            winrate1 = first_stat1.total_winrate
+            winrate2 = first_stat2.total_winrate
+            # Calculate weighted averages for DPM and KDA
+            dpm1 = sum(stat.avg_damage_per_minute * stat.champion_games for stat in data_user1) / total_games1 if total_games1 > 0 else 0
+            dpm2 = sum(stat.avg_damage_per_minute * stat.champion_games for stat in data_user2) / total_games2 if total_games2 > 0 else 0
+            kda1 = sum(stat.average_kda * stat.champion_games for stat in data_user1) / total_games1 if total_games1 > 0 else 0
+            kda2 = sum(stat.average_kda * stat.champion_games for stat in data_user2) / total_games2 if total_games2 > 0 else 0
+            triples1 = sum(stat.total_triples for stat in data_user1)
+            triples2 = sum(stat.total_triples for stat in data_user2)
+            quadras1 = sum(stat.total_quadras for stat in data_user1)
+            quadras2 = sum(stat.total_quadras for stat in data_user2)
+            pentas1 = sum(stat.total_pentas for stat in data_user1)
+            pentas2 = sum(stat.total_pentas for stat in data_user2)
+
+            table += f"Overall Stats:\n"
+
+        # Add comparison stats
+        table += f"{'Games':<20} {games1:<15} {games2:<15}\n"
+        table += f"{'Total Hours':<20} {total_hours1:<15.1f} {total_hours2:<15.1f}\n"
+        table += f"{'Win Rate %':<20} {winrate1:<15.1f} {winrate2:<15.1f}\n"
+        table += f"{'DPM':<20} {int(dpm1):<15} {int(dpm2):<15}\n"
+        table += f"{'KDA':<20} {kda1:<15.2f} {kda2:<15.2f}\n"
+        table += f"{'Triple Kills':<20} {triples1:<15} {triples2:<15}\n"
+        table += f"{'Quadra Kills':<20} {quadras1:<15} {quadras2:<15}\n"
+        table += f"{'Penta Kills':<20} {pentas1:<15} {pentas2:<15}\n"
 
         table += "```"
-
         return table
     
-    async def format_player_friends_data(self, data, username):
+    async def format_player_friends_data(self, data: List[PlayerFriendStats], username: str) -> str:
         # Create the stats table
         table = "```\nDuo Queue Stats:\n"
         table += f"{'Friend':<15} {'Games':<8} {'Wins':<8} {'Win%':<8}\n"
@@ -114,14 +154,14 @@ class DataFormatter(commands.Cog):
         total_games = 0
         weighted_winrate = 0
         
-        for row in data:
-            name = row[0][:14]  # Limit name length
-            games = str(row[1])
-            wins = str(row[2])
-            winrate = f"{row[3]:.1f}"
+        for friend_stat in data:
+            name = friend_stat.teammate_name[:14]
+            games = str(friend_stat.games_together)
+            wins = str(friend_stat.wins_together)
+            winrate = f"{friend_stat.win_rate:.1f}"
             
-            total_games += row[1]
-            weighted_winrate += row[1] * row[3]
+            total_games += friend_stat.games_together
+            weighted_winrate += friend_stat.games_together * friend_stat.win_rate
             
             table += f"{name:<15} {games:<8} {wins:<8} {winrate:<8}\n"
         
@@ -137,7 +177,7 @@ class DataFormatter(commands.Cog):
 
         return description
 
-    async def format_active_players(self, active_players):
+    async def format_active_players(self, active_players: List[dict]) -> str:
         # Sort players by winrate (handling N/A cases)
         def get_winrate_value(player):
             # Convert "N/A" to -1 for sorting purposes
@@ -164,17 +204,17 @@ class DataFormatter(commands.Cog):
         table += "```"
         return table
 
-    async def format_update_database_scan_message(self, users):
+    async def format_update_database_scan_message(self, users: List[User]) -> dict:
         table = "```\n"  # Start code block for better formatting
         for user in users:
-            table += f"• {user[1]}\n"
+            table += f"• {user.riot_id_game_name}\n"
         table += "```"  # End code block
         return {
             "title": "🎮 Looking for New Matches",
             "description": f"Scanning for new matches from:\n{table}"
         }
 
-    async def format_update_database_progress_message(self, game_name, match_count):
+    async def format_update_database_progress_message(self, game_name: str, match_count: int) -> dict:
         return {
             "title": "🎮 Updating Database",
             "description": f"Adding {match_count} matches to the database found for {game_name}"

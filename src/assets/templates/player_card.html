@@ -21,7 +21,7 @@
             margin: 0;
             padding: 0;
             width: 1500px;
-            height: 1200px;
+            height: 1300px;
             position: relative;
             display: flex;
             align-items: center;
@@ -71,7 +71,25 @@
                         0 5px 15px rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
-
+        }
+        .profile-card {
+            background: linear-gradient(135deg, 
+                rgba(35, 40, 45, 0.6), 
+                rgba(20, 23, 26, 0.8));
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            padding: 15px;
+        }
+        .profile-card .card-body {
+            padding: 1.5rem;
+        }
+        .profile-card h2 {
+            font-size: 42px;
+            margin: 0;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5),
+                         0 2px 20px rgba(0, 0, 0, 0.3);
+            letter-spacing: 2px;
+            font-weight: 800;
         }
         .card::before {
             content: '';
@@ -123,6 +141,29 @@
             align-items: center;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+
+        .performance-box {
+            background: linear-gradient(135deg, 
+                rgba(22, 25, 28, 0.95), 
+                rgba(15, 18, 21, 0.98));
+            border-radius: 25px;
+            padding: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: visible;
+            min-width: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-bottom: 10px;
+        }
+
         .stats-box:hover {
             transform: translateY(-2px);
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4),
@@ -244,7 +285,7 @@
             height: 130px;
         }
         .card-body {
-            padding: 0 30px 30px 30px;
+            padding: 30 30px 30px 30px;
         }
         h4.theme-primary {
             font-family: 'BeaufortforLOL', sans-serif;
@@ -296,6 +337,45 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .profile-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            object-fit: cover;
+        }
+        .summoner-level {
+            font-size: 20px;
+            color: #c7c7c7;
+            margin-top: 4px;
+            text-align: center;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        .profile-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 1.5rem;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, 
+                rgba(30, 35, 40, 0.7), 
+                rgba(15, 18, 21, 0.9));
+            height: 98%;
+            margin: 0.75rem;
+        }
+        .stats-card .champions-table {
+            height: auto;
+            margin-top: 0;
+        }
+        .stats-card .card-body {
+            padding: 1.5rem;
+        }
+        .profile-card .card-body {
+            padding: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -304,40 +384,52 @@
         <div class="overlay"></div>
     </div>
     <div class="content">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="theme-primary">{{summoner_name}}'s {{gamemode}} Stats</h2>
-            </div>
-            <div class="card-body">
-                <div class="row mb-4">
-                    <div class="col-3">
-                        <div class="stats-box">
-                            <div class="stats-value theme-primary">{{total_games}}</div>
-                            <div class="stats-label">Games</div>
-                        </div>
+        <!-- Profile Card -->
+        <div class="card profile-card mb-4">
+            <div class="card-body py-3">
+                <div class="d-flex align-items-center justify-content-center">
+                    <div class="profile-container">
+                        <img src="data:image/jpeg;base64,{{profile_icon}}" class="profile-icon" alt="Profile Icon">
+                        <div class="summoner-level">Level {{summoner_level}}</div>
                     </div>
-                    <div class="col-3">
-                        <div class="stats-box">
-                            <div class="stats-value" style="color: rgb{{total_winrate_color}}">{{total_winrate}}%</div>
-                            <div class="stats-label">Win Rate</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="stats-box">
-                            <div class="stats-value theme-primary">{{total_hours}}h</div>
-                            <div class="stats-label">Played</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="stats-box">
-                            <div class="stats-value theme-primary">{{total_pentas}}</div>
-                            <div class="stats-label">Pentas</div>
-                        </div>
-                    </div>
+                    <h2 class="theme-primary mb-0">{{summoner_name}}'s {{gamemode}} Stats</h2>
                 </div>
                 
-                <div class="row">
-                    <div class="col-6">
+            </div>
+            <div class="row mb-4">
+                <div class="col-3">
+                    <div class="stats-box">
+                        <div class="stats-value theme-primary">{{total_games}}</div>
+                        <div class="stats-label">Games</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stats-box">
+                        <div class="stats-value" style="color: rgb{{total_winrate_color}}">{{total_winrate}}%</div>
+                        <div class="stats-label">Win Rate</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stats-box">
+                        <div class="stats-value theme-primary">{{total_hours}}h</div>
+                        <div class="stats-label">Played</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stats-box">
+                        <div class="stats-value theme-primary">{{total_pentas}}</div>
+                        <div class="stats-label">Pentas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Stats Cards -->
+        <div class="row">
+            <!-- Top Champions Card -->
+            <div class="col-6">
+                <div class="card stats-card">
+                    <div class="card-body">
                         <div class="heading-wrapper">
                             <h4 class="theme-primary">Top Champions</h4>
                         </div>
@@ -372,36 +464,42 @@
                             </table>
                         </div>
                     </div>
-                    <div class="col-6">
+                </div>
+            </div>
+
+            <!-- Performance Highlights Card -->
+            <div class="col-6">
+                <div class="card stats-card">
+                    <div class="card-body">
                         <div class="heading-wrapper">
                             <h4 class="theme-primary">Performance Highlights</h4>
                         </div>
                         <div class="champions-table">
                             <div class="row g-3">
                                 <div class="col-6">
-                                    <div class="stats-box mb-3" style="height: 110px;">
+                                    <div class="performance-box mb-3" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].total_first_bloods}}</div>
                                         <div class="stats-label">First Bloods</div>
                                     </div>
-                                    <div class="stats-box mb-3" style="height: 110px;">
+                                    <div class="performance-box mb-3" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].total_objectives}}</div>
                                         <div class="stats-label">Objectives Taken</div>
                                     </div>
-                                    <div class="stats-box" style="height: 110px;">
+                                    <div class="performance-box" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].avg_vision_score}}</div>
                                         <div class="stats-label">Avg Vision Score</div>
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="stats-box mb-3" style="height: 110px;">
+                                    <div class="performance-box mb-3" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].avg_kill_participation}}%</div>
                                         <div class="stats-label">Kill Participation</div>
                                     </div>
-                                    <div class="stats-box mb-3" style="height: 110px;">
+                                    <div class="performance-box mb-3" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].avg_gold_per_min}}</div>
                                         <div class="stats-label">Gold per Minute</div>
                                     </div>
-                                    <div class="stats-box" style="height: 110px;">
+                                    <div class="performance-box" style="height: 110px;">
                                         <div class="stats-value theme-primary">{{champions[0].avg_damage_taken_per_min}}</div>
                                         <div class="stats-label">Damage Taken per Minute</div>
                                     </div>
@@ -409,7 +507,7 @@
                             </div>
                             <div class="row mt-3">
                                 <div class="col-12">
-                                    <div class="stats-box mb-3" style="height: 140px;">
+                                    <div class="performance-box mb-3" style="height: 140px;">
                                         <div class="row w-100 align-items-center">
                                             <div class="col-7">
                                                 <div class="stats-value theme-primary">{{champions[0].max_killing_spree}}</div>
@@ -420,7 +518,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="stats-box" style="height: 140px;">
+                                    <div class="performance-box" style="height: 140px;">
                                         <div class="row w-100 align-items-center">
                                             <div class="col-7">
                                                 <div class="stats-value theme-primary">{{champions[0].max_kda}}</div>

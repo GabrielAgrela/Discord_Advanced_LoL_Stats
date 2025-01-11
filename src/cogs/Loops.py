@@ -120,18 +120,26 @@ class Loops(commands.Cog):
                     # Sort active players by winrate (highest first)
                     active_players.sort(key=lambda x: x['stats'].winrate if x['stats'] else 0, reverse=True)
                     
-                    # Generate live players card
-                    card = await self.bot.get_cog("CardGenerator").generate_live_players_card(active_players)
-                    
                     # Find the botlol channel
                     for guild in self.bot.guilds:
                         if active_players[0]['guild_id'] != str(guild.id):
                             continue
                         channel = disnake.utils.get(guild.text_channels, name="botlol")
                         if channel:
-                            message = await channel.send(
-                                file=card
+                            # Send initial embed
+                            initial_embed = disnake.Embed(
+                                title="🎮 Live Game Found!",
+                                description="Generating player statistics... Please wait.",
+                                color=disnake.Color.blue()
                             )
+                            message = await channel.send(embed=initial_embed)
+                            
+                            # Generate live players card
+                            card = await self.bot.get_cog("CardGenerator").generate_live_players_card(active_players)
+                            
+                            # Edit the message with the card
+                            await message.edit(embed=None, file=card)
+                            
                             # Store the message info for later cleanup
                             for player in active_players:
                                 self.live_game_messages[player['game_id']] = {

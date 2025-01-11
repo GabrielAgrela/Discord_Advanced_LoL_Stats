@@ -147,6 +147,15 @@ class CardGenerator(commands.Cog):
         bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
         with open(bg_image_path, "rb") as image_file:
             encoded_image = base64.b64encode(image_file.read()).decode()
+            
+        # Read and encode profile icon - find latest patch folder
+        gamedata_path = os.path.join(self.assets_path, "gamedata")
+        patch_folders = [d for d in os.listdir(gamedata_path) if os.path.isdir(os.path.join(gamedata_path, d)) and d not in ['img']]
+        latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"  # Fallback to 15.1.1 if no folders found
+        
+        profile_icon_path = os.path.join(self.assets_path, "gamedata", latest_patch, "img", "profileicon", f"{data[0].profile_icon}.png")
+        with open(profile_icon_path, "rb") as image_file:
+            encoded_profile_icon = base64.b64encode(image_file.read()).decode()
         
         # Render template
         template = self.jinja_env.get_template('player_card.html')
@@ -158,8 +167,11 @@ class CardGenerator(commands.Cog):
             total_hours=int(total_hours),
             total_pentas=total_pentas,
             total_winrate=total_winrate,
+            total_winrate_color=self.get_winrate_color(total_winrate),
             champions=champions,
-            background_image=encoded_image
+            background_image=encoded_image,
+            profile_icon=encoded_profile_icon,
+            summoner_level=data[0].summoner_level
         )
         
         # Use playwright to render HTML to image
@@ -173,7 +185,7 @@ class CardGenerator(commands.Cog):
             await page.wait_for_timeout(500)
             
             # Resize viewport to match content
-            await page.set_viewport_size({'width': 1500, 'height': 1200})
+            await page.set_viewport_size({'width': 1500, 'height': 1300})
             
             # Take screenshot of the entire content
             screenshot = await page.screenshot()
@@ -218,6 +230,11 @@ class CardGenerator(commands.Cog):
             # Get the first player's gamemode for theming
             theme = self.gamemode_themes.get(players[0]['gameMode'], self.gamemode_themes['CLASSIC'])
 
+            # Find latest patch folder for profile icons
+            gamedata_path = os.path.join(self.assets_path, "gamedata")
+            patch_folders = [d for d in os.listdir(gamedata_path) if os.path.isdir(os.path.join(gamedata_path, d)) and d not in ['img']]
+            latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"  # Fallback to 15.1.1 if no folders found
+
             # Prepare player data with champion icons and stats
             for player in players:
                 champion_name = player['champion'].replace(" ", "").replace("'", "").replace(".", "")
@@ -226,8 +243,14 @@ class CardGenerator(commands.Cog):
                 with open(champion_image_path, "rb") as image_file:
                     player['champion_icon'] = base64.b64encode(image_file.read()).decode()
                 
-                # Format stats
                 stats = player['stats']
+                # Read and encode profile icon
+                profile_icon_path = os.path.join(self.assets_path, "gamedata", latest_patch, "img", "profileicon", f"{stats.profile_icon}.png")
+                with open(profile_icon_path, "rb") as image_file:
+                    player['profile_icon'] = base64.b64encode(image_file.read()).decode()
+                
+                # Format stats
+                
                 if stats:
                     player['games'] = stats.champion_games
                     player['winrate'] = f"{stats.winrate:.1f}"
@@ -235,6 +258,7 @@ class CardGenerator(commands.Cog):
                     player['pentas'] = stats.total_pentas
                     player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
                     player['avg_time_dead_pct'] = f"{stats.avg_time_dead_pct:.1f}"
+                    player['summoner_level'] = stats.summoner_level
                     
                     # Add color coding for winrate and KDA
                     player['winrate_color'] = self.get_winrate_color(stats.winrate)
@@ -246,6 +270,7 @@ class CardGenerator(commands.Cog):
                     player['pentas'] = 0
                     player['damage_per_min'] = "N/A"
                     player['avg_time_dead_pct'] = "N/A"
+                    player['summoner_level'] = player.get('summonerLevel', 0)
                     player['winrate_color'] = (128, 128, 128)  # Gray for N/A
                     player['kda_color'] = (128, 128, 128)  # Gray for N/A
 
@@ -263,7 +288,7 @@ class CardGenerator(commands.Cog):
 
             # Set content and viewport
             await page.set_content(html_content)
-            await page.set_viewport_size({"width": 1500, "height": 1100})
+            await page.set_viewport_size({"width": 1500, "height": 1300})
             await page.wait_for_load_state('networkidle')
             await page.wait_for_timeout(500)
 

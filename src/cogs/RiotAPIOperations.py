@@ -43,13 +43,13 @@ class RiotAPIOperations(commands.Cog):
             if len(self.short_window) >= 19:  # Leave room for buffer
                 sleep_time = 1 - (current_time - self.short_window[0]) + buffer_time
                 if sleep_time > 0:
-                    print(f"Sleeping for {sleep_time} seconds")
+                    print(f"Sleeping short for {sleep_time} seconds")
                     await asyncio.sleep(sleep_time)
                     
             if len(self.long_window) >= 99:  # Leave room for buffer
                 sleep_time = 120 - (current_time - self.long_window[0]) + buffer_time
                 if sleep_time > 0:
-                    print(f"Sleeping for {sleep_time} seconds")
+                    print(f"Sleeping long for {sleep_time} seconds")
                     await asyncio.sleep(sleep_time)
             
             # Add current request timestamp

@@ -190,7 +190,7 @@ class PlayerStats:
                  total_pentas_overall: int, total_winrate: float, avg_time_dead_pct: float, avg_vision_score: float,
                  avg_kill_participation: float, avg_damage_taken_per_min: float, total_first_bloods: int,
                  total_objectives: int, avg_gold_per_min: float, max_killing_spree: int, max_kda: float,
-                 max_killing_spree_champion: str, max_kda_champion: str):
+                 max_killing_spree_champion: str, max_kda_champion: str, summoner_level: int, profile_icon: int):
         self.champion_name = champion_name
         self.champion_games = champion_games
         self.winrate = winrate
@@ -217,6 +217,8 @@ class PlayerStats:
         self.max_kda = max_kda
         self.max_killing_spree_champion = max_killing_spree_champion
         self.max_kda_champion = max_kda_champion
+        self.summoner_level = summoner_level
+        self.profile_icon = profile_icon
 
 @dataclass
 class PlayerFriendStats:

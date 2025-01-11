@@ -8,7 +8,9 @@ import jinja2
 import io
 import base64
 from typing import List
+from PIL import Image, ImageFilter, ImageDraw
 from ..models.models import PlayerStats
+
 
 class CardGenerator(commands.Cog):
     def __init__(self, bot):
@@ -108,9 +110,15 @@ class CardGenerator(commands.Cog):
             kda = stat.average_kda
             
             # Read and encode champion image
-            champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "tiles", f"{stat.champion_name}_0.jpg")
+            champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "centered", f"{stat.champion_name}_0.jpg")
+            max_killing_spree_champion = os.path.join(self.assets_path, "gamedata", "img", "champion", "splash", f"{stat.max_killing_spree_champion}_0.jpg")
+            max_kda_champion = os.path.join(self.assets_path, "gamedata", "img", "champion", "splash", f"{stat.max_kda_champion}_0.jpg")
             with open(champion_image_path, "rb") as image_file:
                 encoded_champion_image = base64.b64encode(image_file.read()).decode()
+            with open(max_killing_spree_champion, "rb") as image_file:
+                encoded_max_killing_spree_champion = base64.b64encode(image_file.read()).decode()
+            with open(max_kda_champion, "rb") as image_file:
+                encoded_max_kda_champion = base64.b64encode(image_file.read()).decode()
             
             champions.append({
                 'name': stat.champion_name[:15],
@@ -125,6 +133,8 @@ class CardGenerator(commands.Cog):
                 'image': encoded_champion_image,
                 'max_killing_spree': stat.max_killing_spree,
                 'max_kda': f"{stat.max_kda:.1f}",
+                'max_killing_spree_image': encoded_max_killing_spree_champion,
+                'max_kda_image': encoded_max_kda_champion,
                 'total_first_bloods': stat.total_first_bloods,
                 'total_objectives': stat.total_objectives,
                 'avg_vision_score': f"{stat.avg_vision_score:.1f}",
@@ -168,10 +178,129 @@ class CardGenerator(commands.Cog):
             # Take screenshot of the entire content
             screenshot = await page.screenshot()
             await browser.close()
+
+            # Convert bytes to BytesIO and process image
+            img_byte_arr = io.BytesIO(screenshot)
+            image = Image.open(img_byte_arr)
             
-            # Convert to discord file
-            image_binary = io.BytesIO(screenshot)
-            return disnake.File(fp=image_binary, filename='player_card.png')
+            # Create a mask for rounded corners
+            mask = Image.new('L', (image.width, image.height), 0)
+            radius = 100  # Increased corner radius
+            
+            # Draw the rounded rectangle on the mask
+            draw = ImageDraw.Draw(mask)
+            draw.rounded_rectangle([(0, 0), (image.width-1, image.height-1)], radius=radius, fill=255)
+            
+            # Create output image with transparency
+            output_image = Image.new('RGBA', image.size, (0, 0, 0, 0))
+            output_image.paste(image, mask=mask)
+            
+            # Save to BytesIO
+            output = io.BytesIO()
+            output_image.save(output, format='PNG')
+            output.seek(0)
+            
+            # Return as discord file
+            return disnake.File(fp=output, filename='player_card.png')
+
+    async def generate_live_players_card(self, players: list) -> disnake.File:
+        """Generate a card showing all currently active players."""
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+
+            # Create Jinja2 environment
+            env = jinja2.Environment(
+                loader=jinja2.FileSystemLoader(self.template_path)
+            )
+            template = env.get_template('live_players_card.html')
+
+            # Get the first player's gamemode for theming
+            theme = self.gamemode_themes.get(players[0]['gameMode'], self.gamemode_themes['CLASSIC'])
+
+            # Prepare player data with champion icons and stats
+            for player in players:
+                champion_name = player['champion'].replace(" ", "").replace("'", "").replace(".", "")
+                # Read and encode champion images
+                champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "tiles", f"{champion_name}_0.jpg")
+                with open(champion_image_path, "rb") as image_file:
+                    player['champion_icon'] = base64.b64encode(image_file.read()).decode()
+                
+                # Format stats
+                stats = player['stats']
+                if stats:
+                    player['games'] = stats.champion_games
+                    player['winrate'] = f"{stats.winrate:.1f}"
+                    player['kda'] = f"{stats.average_kda:.2f}"
+                    player['pentas'] = stats.total_pentas
+                    player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
+                    player['avg_time_dead_pct'] = f"{stats.avg_time_dead_pct:.1f}"
+                    
+                    # Add color coding for winrate and KDA
+                    player['winrate_color'] = self.get_winrate_color(stats.winrate)
+                    player['kda_color'] = self.get_kda_color(stats.average_kda, theme)
+                else:
+                    player['games'] = 0
+                    player['winrate'] = "N/A"
+                    player['kda'] = "N/A"
+                    player['pentas'] = 0
+                    player['damage_per_min'] = "N/A"
+                    player['avg_time_dead_pct'] = "N/A"
+                    player['winrate_color'] = (128, 128, 128)  # Gray for N/A
+                    player['kda_color'] = (128, 128, 128)  # Gray for N/A
+
+            # Read and encode background image
+            bg_image_path = os.path.join(self.assets_path, "images", f"{players[0]['gameMode']}.png")
+            with open(bg_image_path, "rb") as image_file:
+                background_image = base64.b64encode(image_file.read()).decode()
+
+            # Render template
+            html_content = template.render(
+                players=players,
+                theme=theme,
+                background_image=background_image
+            )
+
+            # Set content and viewport
+            await page.set_content(html_content)
+            await page.set_viewport_size({"width": 1500, "height": 1100})
+            await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(500)
+
+            # Take screenshot
+            screenshot = await page.screenshot(
+                type='png',
+                full_page=True
+            )
+
+            await browser.close()
+
+            # Convert bytes to BytesIO and process image
+            img_byte_arr = io.BytesIO(screenshot)
+            image = Image.open(img_byte_arr)
+            
+            # Create a mask for rounded corners
+            mask = Image.new('L', (image.width, image.height), 0)
+            radius = 50  # Increased corner radius
+            
+            # Draw the rounded rectangle on the mask
+            draw = ImageDraw.Draw(mask)
+            draw.rounded_rectangle([(0, 0), (image.width-1, image.height-1)], radius=radius, fill=255)
+            
+            # Create output image with transparency
+            output_image = Image.new('RGBA', image.size, (0, 0, 0, 0))
+            output_image.paste(image, mask=mask)
+            
+            # Save to BytesIO
+            output = io.BytesIO()
+            output_image.save(output, format='PNG')
+            output.seek(0)
+            
+            # Return as discord file
+            return disnake.File(
+                fp=output,
+                filename=f'live_players_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+            )
 
 def setup(bot):
     bot.add_cog(CardGenerator(bot)) 

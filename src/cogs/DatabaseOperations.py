@@ -78,6 +78,7 @@ class DatabaseOperations(commands.Cog):
             SELECT 
                 ROUND(AVG(kill_participation * 100), 1) as overall_kill_participation,
                 MAX(largest_killing_spree) as overall_max_killing_spree,
+                (SELECT champion_name FROM base_data WHERE largest_killing_spree = (SELECT MAX(largest_killing_spree) FROM base_data)) as max_killing_spree_champion,
                 SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as overall_first_bloods,
                 SUM(turret_takedowns + inhibitor_takedowns) as overall_objectives,
                 ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as overall_gold_per_min,
@@ -86,6 +87,8 @@ class DatabaseOperations(commands.Cog):
                     WHEN deaths = 0 THEN kills + assists 
                     ELSE CAST((kills + assists) AS FLOAT) / deaths 
                 END) as overall_max_kda,
+                (SELECT champion_name FROM base_data WHERE (CASE WHEN deaths = 0 THEN kills + assists ELSE CAST((kills + assists) AS FLOAT) / deaths END) = 
+                    (SELECT MAX(CASE WHEN deaths = 0 THEN kills + assists ELSE CAST((kills + assists) AS FLOAT) / deaths END) FROM base_data)) as max_kda_champion,
                 ROUND(AVG(vision_score), 1) as overall_vision_score
             FROM base_data
         )
@@ -114,7 +117,9 @@ class DatabaseOperations(commands.Cog):
             (SELECT overall_objectives FROM overall_stats) as total_objectives,
             (SELECT overall_gold_per_min FROM overall_stats) as avg_gold_per_min,
             (SELECT overall_max_killing_spree FROM overall_stats) as max_killing_spree,
-            (SELECT overall_max_kda FROM overall_stats) as max_kda
+            (SELECT max_killing_spree_champion FROM overall_stats) as max_killing_spree_champion,
+            (SELECT overall_max_kda FROM overall_stats) as max_kda,
+            (SELECT max_kda_champion FROM overall_stats) as max_kda_champion
         FROM champion_stats
         ORDER BY {sort_column} {sort_order}, champion_games DESC
         LIMIT ?;
@@ -167,7 +172,9 @@ class DatabaseOperations(commands.Cog):
                 total_objectives=row[20],
                 avg_gold_per_min=row[21],
                 max_killing_spree=row[22],
-                max_kda=row[23]
+                max_killing_spree_champion=row[23],
+                max_kda=row[24],
+                max_kda_champion=row[25]
             ))
         return player_stats
 

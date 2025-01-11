@@ -60,38 +60,28 @@ class Loops(commands.Cog):
                                     tracked_user = next((u for u in users if u.puuid == participant['puuid']), None)
                                     if tracked_user:
                                         champion = await self.bot.get_cog("DatabaseOperations").get_champion(participant['championId'])
-                                        
+                                        #replace the champion string spaces and apostrophes with nothing and make it lowercase and the first letter uppercase
+                                        #if champ has ' 
+                                        if "'" in champion:
+                                            champion = champion.replace(" ", "").replace("'", "").lower().capitalize()
+                                        else:
+                                            champion = champion.replace(" ", "")
                                         # Get player stats for this champion/gamemode
                                         stats = await self.bot.get_cog("DatabaseOperations").get_player_stats(
                                             tracked_user.riot_id_game_name, 
                                             game_data['gameMode'], 
                                             champion.replace(" ", "").replace("'", "")
                                         )
-                                        
-                                        # Extract relevant stats or use defaults if no stats available
-                                        if stats:
-                                            games = stats[0].champion_games
-                                            winrate = f"{stats[0].winrate:.1f}"
-                                            kda = f"{stats[0].average_kda:.2f}"
-                                            pentas = stats[0].total_pentas
-                                        else:
-                                            games = 0
-                                            winrate = "N/A"
-                                            kda = "N/A"
-                                            pentas = 0
 
                                         active_players.append({
                                             'name': tracked_user.riot_id_game_name,
                                             'champion': champion,
                                             'gameMode': game_data['gameMode'],
-                                            'games': games,
-                                            'winrate': winrate,
-                                            'kda': kda,
-                                            'pentas': pentas,
+                                            'stats': stats[0] if stats else None,
                                             'guild_id': tracked_user.guild_id,
                                             'game_id': str(game_data['gameId'])
                                         })
-
+                                        
                                         await self.bot.get_cog("DatabaseOperations").update_user(
                                             tracked_user.username, 
                                             last_game_played=game_data['gameId']
@@ -112,9 +102,10 @@ class Loops(commands.Cog):
                             # edit title saying game is over, but keep the table and after 5 seconds delete the message
                             await message.edit(embed=disnake.Embed(
                                 title="🎮 Game Over - Deleting in 30 seconds",
-                                description=message.embeds[0].description,
                                 color=disnake.Color.red()
                             ))
+                            # Update database with new matches in a separate task
+                            self.bot.loop.create_task(self.bot.get_cog("RiotAPIOperations").update_database(announce=True))
                             await asyncio.sleep(30)
                             await message.delete()
                         except Exception as e:
@@ -126,11 +117,11 @@ class Loops(commands.Cog):
 
                 # If there are active players, create and send the table
                 if active_players:
-                    # Update database with new matches in a separate task
-                    self.bot.loop.create_task(self.bot.get_cog("RiotAPIOperations").update_database(announce=True))
+                    # Sort active players by winrate (highest first)
+                    active_players.sort(key=lambda x: x['stats'].winrate if x['stats'] else 0, reverse=True)
                     
-                    # Get formatted table from DataFormatter
-                    table = await self.bot.get_cog("DataFormatter").format_active_players(active_players)
+                    # Generate live players card
+                    card = await self.bot.get_cog("CardGenerator").generate_live_players_card(active_players)
                     
                     # Find the botlol channel
                     for guild in self.bot.guilds:
@@ -138,12 +129,9 @@ class Loops(commands.Cog):
                             continue
                         channel = disnake.utils.get(guild.text_channels, name="botlol")
                         if channel:
-                            embed = disnake.Embed(
-                                title="🎮 Live Game(s)",
-                                description=table,
-                                color=disnake.Color.blue()
+                            message = await channel.send(
+                                file=card
                             )
-                            message = await channel.send(embed=embed)
                             # Store the message info for later cleanup
                             for player in active_players:
                                 self.live_game_messages[player['game_id']] = {

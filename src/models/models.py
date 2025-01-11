@@ -184,31 +184,39 @@ class Champion:
 
 @dataclass
 class PlayerStats:
-    champion_name: str
-    champion_games: int
-    winrate: float
-    avg_damage_per_minute: float
-    average_kda: float
-    total_games_overall: int
-    unique_champions_played: int
-    unique_champ_ratio: float
-    oldest_game: str
-    total_hours_played: float
-    total_triples: int
-    total_quadras: int
-    total_pentas: int
-    total_pentas_overall: int
-    total_winrate: float
-    avg_time_dead_pct: float  # Average percentage of time spent dead
-    # New stats
-    avg_vision_score: float
-    avg_kill_participation: float
-    avg_damage_taken_per_min: float
-    total_first_bloods: int
-    total_objectives: int  # Sum of turrets, inhibitors, dragons etc.
-    avg_gold_per_min: float
-    max_killing_spree: int
-    max_kda: float
+    def __init__(self, champion_name: str, champion_games: int, winrate: float, avg_damage_per_minute: float,
+                 average_kda: float, total_games_overall: int, unique_champions_played: int, unique_champ_ratio: float,
+                 oldest_game: str, total_hours_played: float, total_triples: int, total_quadras: int, total_pentas: int,
+                 total_pentas_overall: int, total_winrate: float, avg_time_dead_pct: float, avg_vision_score: float,
+                 avg_kill_participation: float, avg_damage_taken_per_min: float, total_first_bloods: int,
+                 total_objectives: int, avg_gold_per_min: float, max_killing_spree: int, max_kda: float,
+                 max_killing_spree_champion: str, max_kda_champion: str):
+        self.champion_name = champion_name
+        self.champion_games = champion_games
+        self.winrate = winrate
+        self.avg_damage_per_minute = avg_damage_per_minute
+        self.average_kda = average_kda
+        self.total_games_overall = total_games_overall
+        self.unique_champions_played = unique_champions_played
+        self.unique_champ_ratio = unique_champ_ratio
+        self.oldest_game = oldest_game
+        self.total_hours_played = total_hours_played
+        self.total_triples = total_triples
+        self.total_quadras = total_quadras
+        self.total_pentas = total_pentas
+        self.total_pentas_overall = total_pentas_overall
+        self.total_winrate = total_winrate
+        self.avg_time_dead_pct = avg_time_dead_pct
+        self.avg_vision_score = avg_vision_score
+        self.avg_kill_participation = avg_kill_participation
+        self.avg_damage_taken_per_min = avg_damage_taken_per_min
+        self.total_first_bloods = total_first_bloods
+        self.total_objectives = total_objectives
+        self.avg_gold_per_min = avg_gold_per_min
+        self.max_killing_spree = max_killing_spree
+        self.max_kda = max_kda
+        self.max_killing_spree_champion = max_killing_spree_champion
+        self.max_kda_champion = max_kda_champion
 
 @dataclass
 class PlayerFriendStats:

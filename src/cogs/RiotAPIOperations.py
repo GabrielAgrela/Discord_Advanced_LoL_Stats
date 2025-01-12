@@ -27,7 +27,7 @@ class RiotAPIOperations(commands.Cog):
             self.long_window = deque(maxlen=100)  # 100 requests per 2min
             self.method_cooldowns = {}  # Track per-method rate limits
             
-        async def wait_if_needed(self):
+        async def wait_if_needed(self, url = None, params = None):
             current_time = time.time()
             
             # Add additional buffer to prevent hitting limits
@@ -43,13 +43,12 @@ class RiotAPIOperations(commands.Cog):
             if len(self.short_window) >= 19:  # Leave room for buffer
                 sleep_time = 1 - (current_time - self.short_window[0]) + buffer_time
                 if sleep_time > 0:
-                    print(f"Sleeping short for {sleep_time} seconds")
                     await asyncio.sleep(sleep_time)
                     
             if len(self.long_window) >= 99:  # Leave room for buffer
                 sleep_time = 120 - (current_time - self.long_window[0]) + buffer_time
                 if sleep_time > 0:
-                    print(f"Sleeping long for {sleep_time} seconds")
+                    print(f"Sleeping long for {sleep_time} seconds for {url} {params}")
                     await asyncio.sleep(sleep_time)
             
             # Add current request timestamp
@@ -63,7 +62,7 @@ class RiotAPIOperations(commands.Cog):
         
         async with aiohttp.ClientSession() as session:
             for attempt in range(max_retries):
-                await self.rate_limiter.wait_if_needed()
+                await self.rate_limiter.wait_if_needed(url, params)
                 
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
@@ -125,11 +124,8 @@ class RiotAPIOperations(commands.Cog):
             # Track new matches that aren't in the database
             new_matches = [m_id for m_id in match_ids if m_id not in stored_matches]
             new_match_ids.extend(new_matches)
-            
-            print(f"Found {len(all_match_ids)} total matches ({len(new_match_ids)} new)")
-            
+                        
             if len(new_match_ids) == 0:
-                print(f"Skipping to next user.")
                 return new_match_ids
             
             start += chunk_size
@@ -153,7 +149,6 @@ class RiotAPIOperations(commands.Cog):
             
             # Store the match data in the database
             await self.bot.get_cog("DatabaseOperations").insert_match(match_data)
-            print(f"Match ID: {match_id}")
             return match_data
         return None
     
@@ -190,7 +185,6 @@ class RiotAPIOperations(commands.Cog):
         
         for i, user in enumerate(users, 1):
             riot_id = f"{user.riot_id_game_name}#{user.riot_id_tagline}"
-            print(f"\nProcessing player: {riot_id}")
             
             # Update the description to bold the current user
             current_description = original_description.replace(f"• {user.riot_id_game_name}", f"-->{riot_id}")
@@ -200,7 +194,6 @@ class RiotAPIOperations(commands.Cog):
                 match_ids = await self.get_match_ids(user.puuid)
                 
                 if not match_ids:
-                    print(f"No new matches found for {riot_id}!")
                     if announce:
                         if inter:
                             await inter.edit_original_message(embed=disnake.Embed(
@@ -215,7 +208,6 @@ class RiotAPIOperations(commands.Cog):
                                 color=disnake.Color.blue()
                             ))
                 else:
-                    print(f"Processing {len(match_ids)} new matches")
                     # Get formatted message for progress update
                     progress_message = await self.bot.get_cog("DataFormatter").format_update_database_progress_message(user.riot_id_game_name, len(match_ids))
                     progress_description = progress_message["description"] + create_progress_bar(i, total_users)
@@ -241,6 +233,7 @@ class RiotAPIOperations(commands.Cog):
                         
             except Exception as e:
                 print(f"Error processing {riot_id}: {str(e)}")
+                await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error processing {riot_id}: {str(e)}")
                 continue
         
         # Send final update
@@ -371,6 +364,7 @@ class RiotAPIOperations(commands.Cog):
 
         except Exception as e:
             print(f"Error in populate_champions_table: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in populate_champions_table: {e}")
             return 0
 
 def setup(bot):

@@ -28,6 +28,8 @@ class Commands(commands.Cog):
             return filtered_names[:25]
         except Exception as e:
             print(f"Error in autocomplete: {e}")
+            if inter.channel:
+                await inter.channel.send(f"Error in autocomplete: {e}")
             return []
 
     @staticmethod
@@ -40,6 +42,8 @@ class Commands(commands.Cog):
             return []
         except Exception as e:
             print(f"Error in autocomplete wrapper: {e}")
+            if inter.channel:
+                await inter.channel.send(f"Error in autocomplete: {e}")
             return []
 
     @commands.slash_command()
@@ -92,6 +96,7 @@ class Commands(commands.Cog):
                 await inter.followup.send(embed=disnake.Embed(title=f"{summoner_name} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_get_player_stats(data), color=disnake.Color.blue()))
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in get_player_stats: {e}")
 
     @commands.slash_command()
     async def get_all_players_stats(
@@ -116,6 +121,7 @@ class Commands(commands.Cog):
                 await inter.followup.send(embed=disnake.Embed(title="All Players Stats", description=await self.bot.get_cog("DataFormatter").format_get_all_players_stats(data), color=disnake.Color.blue()))
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in get_all_players_stats: {e}")
 
     @commands.slash_command()
     async def compare_players(
@@ -158,6 +164,7 @@ class Commands(commands.Cog):
             await inter.followup.send(embed=disnake.Embed(title=f"{username1} vs {username2} {gamemode} Stats", description=await self.bot.get_cog("DataFormatter").format_player_vs_player(data_user1, data_user2, username1, username2, champion), color=disnake.Color.blue()))
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in compare_players: {e}")
 
     @commands.slash_command()
     async def player_friends_stats(
@@ -186,6 +193,7 @@ class Commands(commands.Cog):
             await inter.followup.send(embed=disnake.Embed(title=f"{username} Friends Stats", description=await self.bot.get_cog("DataFormatter").format_player_friends_data(data, username), color=disnake.Color.blue()))
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in player_friends_stats: {e}")
 
     @commands.slash_command()
     async def update_database(
@@ -276,6 +284,7 @@ class Commands(commands.Cog):
                 
         except Exception as e:
             await inter.followup.send(f"Error generating card: {str(e)}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in generate_card: {str(e)}")
 
     @commands.slash_command()
     async def populate_champions_table(

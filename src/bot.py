@@ -9,6 +9,10 @@ class LoLStatsBot(commands.InteractionBot):
         intents = disnake.Intents.default()
         intents.message_content = True
         intents.guilds = True
+        
+        # Initialize botlol_channel_id to None, will be set in on_ready
+        self.botlol_channel_id = None
+        
         super().__init__(
             intents=intents,
             reload=True  # Enables hot-reloading of cogs during development
@@ -25,10 +29,13 @@ class LoLStatsBot(commands.InteractionBot):
     async def on_ready(self):
         print(f"Logged in as {self.user} (ID: {self.user.id})")
         print("------")
-        # Create botlol channel in all guilds if it doesn't exist
+        # Create botlol channel in all guilds if it doesn't exist and store the first one's ID
         for guild in self.guilds:
-            if not any(channel.name == "botlol" for channel in guild.text_channels):
-                await guild.create_text_channel("botlol")
+            channel = next((channel for channel in guild.text_channels if channel.name == "botlol"), None)
+            if not channel:
+                channel = await guild.create_text_channel("botlol")
+            if self.botlol_channel_id is None:
+                self.botlol_channel_id = channel.id
        # await self.get_cog("Loops").check_if_in_game()
 
     async def on_guild_join(self, guild: disnake.Guild):

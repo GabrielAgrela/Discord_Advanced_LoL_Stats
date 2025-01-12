@@ -92,6 +92,38 @@ class CardGenerator(commands.Cog):
             t2 = (t - 0.5) * 2
             return (int(255 * (1 - t2)), 255, 0)
 
+    def format_champion_name(self, name):
+        # Remove special characters and spaces, keeping letters and numbers
+        name = ''.join(c for c in name if c.isalnum())
+        
+        # Generate variations
+        variations = [
+            name,  # Original (cleaned)
+            name.lower(),  # all lowercase
+            name.capitalize(),  # First letter capital
+            ''.join(word.capitalize() for word in name.lower()),  # CamelCase
+        ]
+        return list(set(variations))  # Remove duplicates
+
+    def load_champion_image(self, champion_name, image_type="tiles"):
+        """
+        Load champion image with support for different image types/paths
+        image_type can be: tiles, centered, splash
+        """
+        name_variations = self.format_champion_name(champion_name)
+        
+        success = False
+        for name in name_variations:
+            try:
+                champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", image_type, f"{name}_0.jpg")
+                if os.path.exists(champion_image_path):
+                    with open(champion_image_path, "rb") as image_file:
+                        return base64.b64encode(image_file.read()).decode()
+            except Exception:
+                continue
+        
+        raise ValueError(f"Could not find champion image for {champion_name} in {image_type}")
+
     async def generate_player_card(self, summoner_name: str, gamemode: str, data: List[PlayerStats]) -> disnake.File:
         """Generate a player card as an image file"""
         # Prepare template data
@@ -109,16 +141,10 @@ class CardGenerator(commands.Cog):
             winrate = stat.winrate
             kda = stat.average_kda
             
-            # Read and encode champion image
-            champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "centered", f"{stat.champion_name}_0.jpg")
-            max_killing_spree_champion = os.path.join(self.assets_path, "gamedata", "img", "champion", "splash", f"{stat.max_killing_spree_champion}_0.jpg")
-            max_kda_champion = os.path.join(self.assets_path, "gamedata", "img", "champion", "splash", f"{stat.max_kda_champion}_0.jpg")
-            with open(champion_image_path, "rb") as image_file:
-                encoded_champion_image = base64.b64encode(image_file.read()).decode()
-            with open(max_killing_spree_champion, "rb") as image_file:
-                encoded_max_killing_spree_champion = base64.b64encode(image_file.read()).decode()
-            with open(max_kda_champion, "rb") as image_file:
-                encoded_max_kda_champion = base64.b64encode(image_file.read()).decode()
+            # Read and encode champion images with different types
+            encoded_champion_image = self.load_champion_image(stat.champion_name, "centered")
+            max_killing_spree_champion = self.load_champion_image(stat.max_killing_spree_champion, "splash")
+            max_kda_champion = self.load_champion_image(stat.max_kda_champion, "splash")
             
             champions.append({
                 'name': stat.champion_name[:15],
@@ -133,8 +159,8 @@ class CardGenerator(commands.Cog):
                 'image': encoded_champion_image,
                 'max_killing_spree': stat.max_killing_spree,
                 'max_kda': f"{stat.max_kda:.1f}",
-                'max_killing_spree_image': encoded_max_killing_spree_champion,
-                'max_kda_image': encoded_max_kda_champion,
+                'max_killing_spree_image': max_killing_spree_champion,
+                'max_kda_image': max_kda_champion,
                 'total_first_bloods': stat.total_first_bloods,
                 'total_objectives': stat.total_objectives,
                 'avg_vision_score': f"{stat.avg_vision_score:.1f}",
@@ -237,11 +263,8 @@ class CardGenerator(commands.Cog):
 
             # Prepare player data with champion icons and stats
             for player in players:
-                champion_name = player['champion'].replace(" ", "").replace("'", "").replace(".", "")
-                # Read and encode champion images
-                champion_image_path = os.path.join(self.assets_path, "gamedata", "img", "champion", "tiles", f"{champion_name}_0.jpg")
-                with open(champion_image_path, "rb") as image_file:
-                    player['champion_icon'] = base64.b64encode(image_file.read()).decode()
+                # Load champion image (tiles for live players card)
+                player['champion_icon'] = self.load_champion_image(player['champion'], "tiles")
                 
                 stats = player['stats']
                 # Read and encode profile icon

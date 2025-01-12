@@ -149,7 +149,20 @@ class DatabaseOperations(commands.Cog):
             cursor.execute(query, (username, gamemode, limit))
 
         results = cursor.fetchall()
+
+        # Additional query to get latest summoner level and profile icon
+        latest_info_query = '''
+        SELECT summoner_level, profile_icon
+        FROM participants p
+        JOIN matches m ON p.match_id = m.match_id
+        WHERE LOWER(p.riot_id_game_name) = LOWER(?)
+        ORDER BY m.game_creation DESC
+        LIMIT 1;
+        '''
+        cursor.execute(latest_info_query, (username,))
+        latest_info = cursor.fetchone()
         conn.close()
+
         player_stats = []
         for row in results:
             player_stats.append(PlayerStats(
@@ -179,8 +192,40 @@ class DatabaseOperations(commands.Cog):
                 max_kda=row[23],
                 max_killing_spree_champion=row[24],
                 max_kda_champion=row[25],
-                summoner_level=row[26],
-                profile_icon=row[27]
+                summoner_level=latest_info[0] if latest_info else 0,
+                profile_icon=latest_info[1] if latest_info else 0
+            ))
+        if not player_stats:
+            # If no champion stats found, still create an entry with the latest summoner info
+            player_stats.append(PlayerStats(
+                champion_name="",
+                champion_games=0,
+                winrate=0.0,
+                avg_damage_per_minute=0.0,
+                average_kda=0.0,
+                total_games_overall=0,
+                unique_champions_played=0,
+                unique_champ_ratio=0.0,
+                oldest_game="",
+                total_hours_played=0.0,
+                total_triples=0,
+                total_quadras=0,
+                total_pentas=0,
+                total_pentas_overall=0,
+                total_winrate=0.0,
+                avg_time_dead_pct=0.0,
+                avg_vision_score=0.0,
+                avg_kill_participation=0.0,
+                avg_damage_taken_per_min=0.0,
+                total_first_bloods=0,
+                total_objectives=0,
+                avg_gold_per_min=0.0,
+                max_killing_spree=0,
+                max_kda=0.0,
+                max_killing_spree_champion="",
+                max_kda_champion="",
+                summoner_level=latest_info[0] if latest_info else 0,
+                profile_icon=latest_info[1] if latest_info else 0
             ))
         return player_stats
 
@@ -645,6 +690,7 @@ class DatabaseOperations(commands.Cog):
             return champions_added
         except Exception as e:
             print(f"Error inserting champions: {e}")
+            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error inserting champions: {e}")
             return 0
         finally:
             conn.close()

@@ -10,6 +10,7 @@ import base64
 from typing import List
 from PIL import Image, ImageFilter, ImageDraw
 from ..models.models import PlayerStats
+from ..Utils import translate
 
 
 class CardGenerator(commands.Cog):
@@ -187,7 +188,7 @@ class CardGenerator(commands.Cog):
         template = self.jinja_env.get_template('player_card.html')
         html_content = template.render(
             summoner_name=summoner_name,
-            gamemode=gamemode,
+            gamemode=translate(gamemode),
             theme_color=theme['primary'],
             total_games=total_games,
             total_hours=int(total_hours),
@@ -305,6 +306,7 @@ class CardGenerator(commands.Cog):
             # Render template
             html_content = template.render(
                 players=players,
+                gamemode=translate(players[0]['gameMode']),
                 theme=theme,
                 background_image=background_image
             )

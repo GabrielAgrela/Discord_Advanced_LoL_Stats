@@ -75,6 +75,8 @@ class RiotAPIOperations(commands.Cog):
                         continue
                     elif response.status == 404:
                         return None
+                    elif response.status == 503:
+                        return None
                     else:
                         response.raise_for_status()
             

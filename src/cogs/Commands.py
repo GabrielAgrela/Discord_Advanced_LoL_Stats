@@ -3,6 +3,7 @@ import disnake
 import asyncio
 from typing import List, Optional
 from ..models.models import User, PlayerStats, PlayerFriendStats
+from ..Utils import translate
 
 class Commands(commands.Cog):
     def __init__(self, bot):
@@ -51,7 +52,7 @@ class Commands(commands.Cog):
         self, 
         inter: disnake.ApplicationCommandInteraction,
         summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
         champion: str = commands.Param(default=None),
         sort_by: str = commands.Param(
             choices=["champion_games", "winrate", "kda", "dpm", "time_dead", "pentas"],
@@ -78,6 +79,7 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
             
+        gamemode = translate(gamemode)
         await inter.response.defer()
         try:
             data: List[PlayerStats] = await asyncio.wait_for(
@@ -129,7 +131,7 @@ class Commands(commands.Cog):
         inter: disnake.ApplicationCommandInteraction,
         username1: str = commands.Param(autocomplete=_autocomplete_wrapper),
         username2: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
         champion: str = commands.Param(default=None)
     ):
         """
@@ -145,6 +147,7 @@ class Commands(commands.Cog):
         if not await self.bot.is_botlol_channel(inter):
             return
         
+        gamemode = translate(gamemode)
         await inter.response.defer()
         try:
             data_user1: List[PlayerStats] = await asyncio.wait_for(
@@ -235,7 +238,7 @@ class Commands(commands.Cog):
         self,
         inter: disnake.ApplicationCommandInteraction,
         summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "CLASSIC", "CHERRY", "NEXUSBLITZ", "STRAWBERRY", "ULTBOOK", "URF"]),
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
         sort_by: str = commands.Param(
             choices=["champion games", "winrate", "kda", "dpm", "time dead", "pentas"],
             default="champion games",
@@ -259,7 +262,8 @@ class Commands(commands.Cog):
             return
             
         await inter.response.defer()
-        
+        gamemode = translate(gamemode)
+
         try:
             # Get player stats
             data: List[PlayerStats] = await self.bot.get_cog("DatabaseOperations").get_player_stats(

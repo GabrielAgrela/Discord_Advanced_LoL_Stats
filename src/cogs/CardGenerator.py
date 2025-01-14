@@ -96,6 +96,9 @@ class CardGenerator(commands.Cog):
     def format_champion_name(self, name):
         # Remove special characters and spaces, keeping letters and numbers
         name = ''.join(c for c in name if c.isalnum())
+
+        if name == "Fiddlesticks":
+            name = "FiddleSticks"
         
         # Generate variations
         variations = [

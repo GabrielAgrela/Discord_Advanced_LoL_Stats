@@ -248,6 +248,10 @@ class Commands(commands.Cog):
             choices=["ASC", "DESC"],
             default="DESC",
             description="Sort order (ascending or descending)"
+        ),
+        min_games: int = commands.Param(
+            default=4,
+            description="Minimum number of games required per champion"
         )
     ):
         """
@@ -270,7 +274,8 @@ class Commands(commands.Cog):
                 summoner_name, 
                 gamemode, 
                 sort_by=sort_by,
-                sort_order=sort_order
+                sort_order=sort_order,
+                min_games=min_games
             )
             if not data:
                 await inter.followup.send(

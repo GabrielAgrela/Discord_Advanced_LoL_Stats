@@ -13,7 +13,7 @@ class DatabaseOperations(commands.Cog):
         self.bot = bot
         self.db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../database/lol_database.db'))
 
-    async def get_player_stats(self, username, gamemode, champion=None, limit=200, sort_by="champion games", sort_order="DESC") -> List[PlayerStats]:
+    async def get_player_stats(self, username, gamemode, champion=None, limit=200, sort_by="champion games", sort_order="DESC", min_games=1) -> List[PlayerStats]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -72,7 +72,7 @@ class DatabaseOperations(commands.Cog):
                 END) as max_kda
             FROM base_data
             GROUP BY champion_name
-            {having_clause}
+            HAVING total_games >= ?
         ),
         overall_stats AS (
             SELECT 
@@ -133,20 +133,18 @@ class DatabaseOperations(commands.Cog):
             # If champion is specified, filter for that champion and remove the HAVING clause
             query = base_query.format(
                 champion_filter="AND LOWER(p.champion_name) = LOWER(?)",
-                having_clause="",
                 sort_column=sort_column,
                 sort_order=sort_order
             )
-            cursor.execute(query, (username, gamemode, champion, limit))
+            cursor.execute(query, (username, gamemode, champion, min_games, limit))
         else:
-            # Original behavior: show champions with 1 or more games
+            # Original behavior: show champions with minimum games
             query = base_query.format(
                 champion_filter="",
-                having_clause="HAVING total_games >= 1",
                 sort_column=sort_column,
                 sort_order=sort_order
             )
-            cursor.execute(query, (username, gamemode, limit))
+            cursor.execute(query, (username, gamemode, min_games, limit))
 
         results = cursor.fetchall()
 
@@ -195,7 +193,38 @@ class DatabaseOperations(commands.Cog):
                 summoner_level=latest_info[0] if latest_info else 0,
                 profile_icon=latest_info[1] if latest_info else 0
             ))
-       
+        if not player_stats:
+            # If no champion stats found, still create an entry with the latest summoner info
+            player_stats.append(PlayerStats(
+                champion_name="",
+                champion_games=0,
+                winrate=0.0,
+                avg_damage_per_minute=0.0,
+                average_kda=0.0,
+                total_games_overall=0,
+                unique_champions_played=0,
+                unique_champ_ratio=0.0,
+                oldest_game="",
+                total_hours_played=0.0,
+                total_triples=0,
+                total_quadras=0,
+                total_pentas=0,
+                total_pentas_overall=0,
+                total_winrate=0.0,
+                avg_time_dead_pct=0.0,
+                avg_vision_score=0.0,
+                avg_kill_participation=0.0,
+                avg_damage_taken_per_min=0.0,
+                total_first_bloods=0,
+                total_objectives=0,
+                avg_gold_per_min=0.0,
+                max_killing_spree=0,
+                max_kda=0.0,
+                max_killing_spree_champion="",
+                max_kda_champion="",
+                summoner_level=latest_info[0] if latest_info else 0,
+                profile_icon=latest_info[1] if latest_info else 0
+            ))
         return player_stats
 
     async def get_all_players_stats(self) -> List[UserStats]:

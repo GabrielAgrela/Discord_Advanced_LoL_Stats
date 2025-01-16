@@ -64,6 +64,13 @@ class CardGenerator(commands.Cog):
             autoescape=True
         )
             
+    def format_percentage(self, value: float) -> str:
+        """Format percentage value, removing decimal if it ends in .0"""
+        formatted = f"{value:.1f}"
+        if formatted.endswith('.0'):
+            return formatted[:-2]
+        return formatted
+            
     def get_winrate_color(self, winrate: float) -> tuple[int, int, int]:
         """Return RGB color tuple based on winrate percentage"""
         if winrate <= 40:
@@ -114,7 +121,7 @@ class CardGenerator(commands.Cog):
         Load champion image with support for different image types/paths
         image_type can be: tiles, centered, splash
         """
-        name_variations = self.format_champion_name(champion_name)
+        name_variations = self.format_champion_name(translate(champion_name))
         
         success = False
         for name in name_variations:
@@ -156,7 +163,7 @@ class CardGenerator(commands.Cog):
                 'pentas': stat.total_pentas,
                 'damage_per_min': f"{stat.avg_damage_per_minute:.0f}",
                 'avg_time_dead_pct': f"{stat.avg_time_dead_pct:.1f}%",
-                'winrate': f"{winrate:.1f}",
+                'winrate': f"{self.format_percentage(winrate)}",
                 'winrate_color': self.get_winrate_color(winrate),
                 'kda': f"{kda:.2f}",
                 'kda_color': self.get_kda_color(kda, theme),
@@ -168,15 +175,18 @@ class CardGenerator(commands.Cog):
                 'total_first_bloods': stat.total_first_bloods,
                 'total_objectives': stat.total_objectives,
                 'avg_vision_score': f"{stat.avg_vision_score:.1f}",
-                'avg_kill_participation': f"{stat.avg_kill_participation:.1f}",
+                'avg_kill_participation': f"{self.format_percentage(stat.avg_kill_participation)}",
                 'avg_gold_per_min': f"{stat.avg_gold_per_min:.0f}",
                 'avg_damage_taken_per_min': f"{stat.avg_damage_taken_per_min:.0f}"
             })
         
         # Read and encode background image
         bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
-        with open(bg_image_path, "rb") as image_file:
-            encoded_image = base64.b64encode(image_file.read()).decode()
+        try:
+            with open(bg_image_path, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode()
+        except FileNotFoundError:
+            encoded_image = None
             
         # Read and encode profile icon - find latest patch folder
         gamedata_path = os.path.join(self.assets_path, "gamedata")
@@ -214,11 +224,28 @@ class CardGenerator(commands.Cog):
             # Wait for background image and fonts to load
             await page.wait_for_timeout(500)
             
-            # Resize viewport to match content
-            await page.set_viewport_size({'width': 1500, 'height': 1300})
+            # Set content and wait for it to load
+            await page.set_content(html_content)
+            await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(500)
+
+            # Get page dimensions
+            dimensions = await page.evaluate('''() => {
+                return {
+                    width: document.documentElement.scrollWidth,
+                    height: document.documentElement.scrollHeight
+                }
+            }''')
             
-            # Take screenshot of the entire content
-            screenshot = await page.screenshot()
+            # Set viewport to match content dimensions
+            await page.set_viewport_size(dimensions)
+
+            # Take screenshot
+            screenshot = await page.screenshot(
+                type='png',
+                full_page=True
+            )
+
             await browser.close()
 
             # Convert bytes to BytesIO and process image
@@ -280,11 +307,11 @@ class CardGenerator(commands.Cog):
                 
                 if stats:
                     player['games'] = stats.champion_games
-                    player['winrate'] = f"{stats.winrate:.1f}"
+                    player['winrate'] = f"{self.format_percentage(stats.winrate)}"
                     player['kda'] = f"{stats.average_kda:.2f}"
                     player['pentas'] = stats.total_pentas
                     player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
-                    player['avg_time_dead_pct'] = f"{stats.avg_time_dead_pct:.1f}"
+                    player['avg_time_dead_pct'] = f"{self.format_percentage(stats.avg_time_dead_pct)}"
                     player['summoner_level'] = stats.summoner_level
                     
                     # Add color coding for winrate and KDA
@@ -303,8 +330,11 @@ class CardGenerator(commands.Cog):
 
             # Read and encode background image
             bg_image_path = os.path.join(self.assets_path, "images", f"{players[0]['gameMode']}.png")
-            with open(bg_image_path, "rb") as image_file:
-                background_image = base64.b64encode(image_file.read()).decode()
+            try:
+                with open(bg_image_path, "rb") as image_file:
+                    background_image = base64.b64encode(image_file.read()).decode()
+            except FileNotFoundError:
+                background_image = None
 
             # Render template
             html_content = template.render(
@@ -314,11 +344,21 @@ class CardGenerator(commands.Cog):
                 background_image=background_image
             )
 
-            # Set content and viewport
+            # Set content and wait for it to load
             await page.set_content(html_content)
-            await page.set_viewport_size({"width": 1500, "height": 1300})
             await page.wait_for_load_state('networkidle')
             await page.wait_for_timeout(500)
+
+            # Get page dimensions
+            dimensions = await page.evaluate('''() => {
+                return {
+                    width: document.documentElement.scrollWidth,
+                    height: document.documentElement.scrollHeight
+                }
+            }''')
+            
+            # Set viewport to match content dimensions
+            await page.set_viewport_size(dimensions)
 
             # Take screenshot
             screenshot = await page.screenshot(
@@ -354,6 +394,166 @@ class CardGenerator(commands.Cog):
                 fp=output,
                 filename=f'live_players_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
             )
+
+    async def generate_champion_card(self, champion_name: str, gamemode: str) -> disnake.File:
+        """Generate a champion card showing top players' stats for a specific champion"""
+        # Get all users from the database
+        db_ops = self.bot.get_cog('DatabaseOperations')
+        users = await db_ops.get_users(active="TRUE")
+        
+        # Get stats for each user for this champion
+        all_player_stats = []
+        for user in users:
+            stats = await db_ops.get_player_stats(
+                username=user.riot_id_game_name,
+                gamemode=gamemode,
+                champion=champion_name,
+                min_games=1  # Only include players who have played this champion
+            )
+            if stats and stats[0].champion_games > 0:  # Only include if they have games on this champion
+                stats[0].name = user.riot_id_game_name
+                stats[0].profile_icon = stats[0].profile_icon  # This is already in the stats
+                all_player_stats.append(stats[0])
+        
+        # Sort by number of games played
+        all_player_stats.sort(key=lambda x: x.champion_games, reverse=True)
+        
+        # Take top 5 by games and then sort them by winrate
+        top_5_players = all_player_stats[:5]
+        top_5_players.sort(key=lambda x: x.winrate, reverse=True)
+        
+        # Prepare template data
+        theme = self.gamemode_themes.get(gamemode, self.gamemode_themes["CLASSIC"])
+        
+        # Prepare player data
+        players = []
+        for stat in top_5_players:  # Using the sorted top 5 players
+            winrate = stat.winrate
+            kda = stat.average_kda
+            
+            # Read and encode profile icon
+            profile_icon_path = os.path.join(self.assets_path, "gamedata", "15.1.1", "img", "profileicon", f"{stat.profile_icon}.png")
+            try:
+                with open(profile_icon_path, "rb") as image_file:
+                    encoded_profile_icon = base64.b64encode(image_file.read()).decode()
+            except FileNotFoundError:
+                encoded_profile_icon = None
+            
+            players.append({
+                'name': stat.name,
+                'games': stat.champion_games,
+                'pentas': stat.total_pentas,
+                'damage_per_min': f"{stat.avg_damage_per_minute:.0f}",
+                'avg_time_dead_pct': f"{self.format_percentage(stat.avg_time_dead_pct)}%",
+                'winrate': f"{self.format_percentage(winrate)}",
+                'winrate_color': self.get_winrate_color(winrate),
+                'kda': f"{kda:.2f}",
+                'kda_color': self.get_kda_color(kda, theme),
+                'max_killing_spree': stat.max_killing_spree,
+                'max_kda': f"{stat.max_kda:.1f}",
+                'total_first_bloods': stat.total_first_bloods,
+                'total_objectives': stat.total_objectives,
+                'avg_kill_participation': f"{self.format_percentage(stat.avg_kill_participation)}",
+                'avg_gold_per_min': f"{stat.avg_gold_per_min:.0f}",
+                'avg_damage_taken_per_min': f"{stat.avg_damage_taken_per_min:.0f}",
+                'profile_icon': encoded_profile_icon
+            })
+            
+        if not players:
+            raise ValueError(f"No players found with games on {champion_name} in {gamemode} mode")
+            
+        # Read and encode champion images
+        champion_image = self.load_champion_image(champion_name, "tiles")
+        champion_loading = self.load_champion_image(champion_name, "loading")
+        
+        # Read and encode background image
+        bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
+        try:
+            with open(bg_image_path, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode()
+        except FileNotFoundError:
+            encoded_image = None
+        
+        # Calculate aggregate stats
+        total_games = sum(stat.champion_games for stat in top_5_players)
+        total_pentas = sum(stat.total_pentas for stat in top_5_players)
+        # Calculate weighted average winrate and format to one decimal place
+        avg_winrate = sum(stat.winrate * stat.champion_games for stat in top_5_players) / total_games if total_games > 0 else 0
+        avg_winrate = round(avg_winrate, 1)
+        
+        # Render template
+        template = self.jinja_env.get_template('champion_card.html')
+        html_content = template.render(
+            champion_name=champion_name,
+            gamemode=translate(gamemode),
+            theme_color=theme['primary'],
+            total_games=total_games,
+            total_pentas=total_pentas,
+            total_winrate=avg_winrate,
+            total_winrate_color=self.get_winrate_color(avg_winrate),
+            players=players,
+            background_image=encoded_image,
+            champion_image=champion_image,
+            champion_loading=champion_loading
+        )
+        
+        # Use playwright to render HTML to image
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page(viewport={'width': 600, 'height': 100})
+            await page.set_content(html_content)
+            await page.wait_for_load_state('networkidle')
+            
+            # Wait for background image and fonts to load
+            await page.wait_for_timeout(500)
+            
+            # Set content and wait for it to load
+            await page.set_content(html_content)
+            await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(500)
+
+            # Get page dimensions
+            dimensions = await page.evaluate('''() => {
+                return {
+                    width: document.documentElement.scrollWidth,
+                    height: document.documentElement.scrollHeight
+                }
+            }''')
+            
+            # Set viewport to match content dimensions
+            await page.set_viewport_size(dimensions)
+
+            # Take screenshot
+            screenshot = await page.screenshot(
+                type='png',
+                full_page=True
+            )
+
+            await browser.close()
+
+            # Convert bytes to BytesIO and process image
+            img_byte_arr = io.BytesIO(screenshot)
+            image = Image.open(img_byte_arr)
+            
+            # Create a mask for rounded corners
+            mask = Image.new('L', (image.width, image.height), 0)
+            radius = 100  # Increased corner radius
+            
+            # Draw the rounded rectangle on the mask
+            draw = ImageDraw.Draw(mask)
+            draw.rounded_rectangle([(0, 0), (image.width-1, image.height-1)], radius=radius, fill=255)
+            
+            # Create output image with transparency
+            output_image = Image.new('RGBA', image.size, (0, 0, 0, 0))
+            output_image.paste(image, mask=mask)
+            
+            # Save to BytesIO
+            output = io.BytesIO()
+            output_image.save(output, format='PNG')
+            output.seek(0)
+            
+            # Return as discord file
+            return disnake.File(fp=output, filename='champion_card.png')
 
 def setup(bot):
     bot.add_cog(CardGenerator(bot)) 

@@ -33,6 +33,19 @@ class Commands(commands.Cog):
                 await inter.channel.send(f"Error in autocomplete: {e}")
             return []
 
+    async def champion_autocomplete(self, inter: disnake.ApplicationCommandInteraction, string: str) -> List[str]:
+        """Autocomplete function for champion names"""
+        try:
+            champion_names = await self.bot.get_cog("DatabaseOperations").get_champion_names()
+            filtered_names = [name for name in champion_names if string.lower() in name.lower()]
+            filtered_names.sort()  # Sort alphabetically
+            return filtered_names[:25]
+        except Exception as e:
+            print(f"Error in champion autocomplete: {e}")
+            if inter.channel:
+                await inter.channel.send(f"Error in champion autocomplete: {e}")
+            return []
+
     @staticmethod
     async def _autocomplete_wrapper(inter: disnake.ApplicationCommandInteraction, string: str) -> List[str]:
         """Static wrapper for autocomplete to work with disnake's expectations"""
@@ -45,6 +58,20 @@ class Commands(commands.Cog):
             print(f"Error in autocomplete wrapper: {e}")
             if inter.channel:
                 await inter.channel.send(f"Error in autocomplete: {e}")
+            return []
+
+    @staticmethod
+    async def _champion_autocomplete_wrapper(inter: disnake.ApplicationCommandInteraction, string: str) -> List[str]:
+        """Static wrapper for champion autocomplete to work with disnake's expectations"""
+        try:
+            cog = inter.bot.get_cog("Commands")
+            if cog:
+                return await cog.champion_autocomplete(inter, string)
+            return []
+        except Exception as e:
+            print(f"Error in champion autocomplete wrapper: {e}")
+            if inter.channel:
+                await inter.channel.send(f"Error in champion autocomplete: {e}")
             return []
 
     @commands.slash_command()
@@ -294,6 +321,29 @@ class Commands(commands.Cog):
         except Exception as e:
             await inter.followup.send(f"Error generating card: {str(e)}")
             await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in generate_card: {str(e)}")
+
+    @commands.slash_command()
+    async def generate_champion_card(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        champion: str = commands.Param(autocomplete=_champion_autocomplete_wrapper),
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"])
+    ):
+        """
+        Generate a champion card with stats
+        
+        Parameters
+        ----------
+        champion: The champion to generate a card for
+        gamemode: The game mode to show stats for
+        """
+        if not await self.bot.is_botlol_channel(inter):
+            return
+        
+        await inter.response.defer()
+        gamemode = translate(gamemode)
+        card_file = await self.bot.get_cog("CardGenerator").generate_champion_card(champion, gamemode)
+        await inter.followup.send(file=card_file)
 
     @commands.slash_command()
     async def populate_champions_table(

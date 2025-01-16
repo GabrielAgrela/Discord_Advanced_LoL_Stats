@@ -721,7 +721,14 @@ class DatabaseOperations(commands.Cog):
         conn.commit()
         conn.close()
     
-    
+    async def get_champion_names(self) -> List[str]:
+        """Get all champion names from the database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT name FROM champions ORDER BY name')
+        names = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return names
 
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

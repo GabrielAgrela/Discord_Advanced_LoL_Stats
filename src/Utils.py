@@ -14,6 +14,8 @@ def translate(text: str) -> str:
             return "Nexus Blitz"
         elif text == "STRAWBERRY":
             return "Swarm"
+        elif text == "Wukong":
+            return "MonkeyKing"
         
         #reverse
         elif text == "Summoner's Rift":
@@ -30,4 +32,6 @@ def translate(text: str) -> str:
             return "URF"
         elif text == "ARAM":
             return "ARAM"
+        elif text == "MonkeyKing":
+            return "Wukong"
         return text

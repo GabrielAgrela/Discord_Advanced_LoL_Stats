@@ -77,6 +77,8 @@ class RiotAPIOperations(commands.Cog):
                         return None
                     elif response.status == 503:
                         return None
+                    elif response.status == 500:
+                        return None
                     else:
                         response.raise_for_status()
             

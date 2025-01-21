@@ -62,28 +62,44 @@ class RiotAPIOperations(commands.Cog):
         
         async with aiohttp.ClientSession() as session:
             for attempt in range(max_retries):
-                await self.rate_limiter.wait_if_needed(url, params)
-                
-                async with session.get(url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        return await response.json()
-                    elif response.status == 429:
-                        # Get retry-after header, default to 5 seconds if not present
-                        retry_after = int(response.headers.get('Retry-After', 5))
-                        print(f"Rate limited. Waiting {retry_after} seconds before retry...")
-                        await asyncio.sleep(retry_after)
+                try:
+                    await self.rate_limiter.wait_if_needed(url, params)
+                    
+                    async with session.get(url, headers=headers, params=params) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        elif response.status == 429:
+                            # Get retry-after header, default to 5 seconds if not present
+                            retry_after = int(response.headers.get('Retry-After', 5))
+                            print(f"Rate limited. Waiting {retry_after} seconds before retry...")
+                            await asyncio.sleep(retry_after)
+                            continue
+                        elif response.status == 404:
+                            return None
+                        elif response.status == 503:
+                            print(f"Service unavailable. Attempt {attempt + 1}/{max_retries}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
+                        elif response.status == 500:
+                            print(f"Internal server error. Attempt {attempt + 1}/{max_retries}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
+                        else:
+                            response.raise_for_status()
+                except aiohttp.ClientConnectorError as e:
+                    print(f"Connection error on attempt {attempt + 1}/{max_retries}: {str(e)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
                         continue
-                    elif response.status == 404:
-                        return None
-                    elif response.status == 503:
-                        return None
-                    elif response.status == 500:
-                        return None
-                    else:
-                        response.raise_for_status()
+                    return None
+                except Exception as e:
+                    print(f"Unexpected error on attempt {attempt + 1}/{max_retries}: {str(e)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    raise
             
-            # If we've exhausted all retries
-            response.raise_for_status()
+            return None
 
     async def get_acc_from_riot_id(self, game_name: str, tag_line: str) -> Optional[Dict[str, Any]]:
         """

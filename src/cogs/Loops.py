@@ -19,20 +19,31 @@ class Loops(commands.Cog):
         # Initialize CPU percent without blocking
         psutil.cpu_percent()
         while not self.bot.is_closed():
-            # Track peak CPU usage over 5 seconds
-            peak_cpu = 0
-            for _ in range(5):
-                # Get CPU percent without interval (non-blocking)
-                cpu_percent = psutil.cpu_percent()
-                peak_cpu = max(peak_cpu, cpu_percent)
-                await asyncio.sleep(1)
-            
-            await self.bot.change_presence(
-                activity=disnake.Activity(
-                    type=disnake.ActivityType.watching,
-                    name=f"CPU Usage: {peak_cpu}%"
-                )
-            )
+            try:
+                # Track peak CPU usage over 5 seconds
+                peak_cpu = 0
+                for _ in range(5):
+                    # Get CPU percent without interval (non-blocking)
+                    cpu_percent = psutil.cpu_percent()
+                    peak_cpu = max(peak_cpu, cpu_percent)
+                    await asyncio.sleep(1)
+                
+                try:
+                    await self.bot.change_presence(
+                        activity=disnake.Activity(
+                            type=disnake.ActivityType.watching,
+                            name=f"CPU Usage: {peak_cpu}%"
+                        )
+                    )
+                except (ConnectionResetError, disnake.ConnectionClosed):
+                    # If connection is reset, wait a bit and let the bot reconnect
+                    await asyncio.sleep(30)
+                    continue
+                    
+            except Exception as e:
+                print(f"Error in update_cpu_status: {e}")
+                await asyncio.sleep(30)  # Wait longer on general errors
+                continue
 
     async def check_if_in_game(self):
         """Checks if tracked users are in game and announces their games."""

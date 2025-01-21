@@ -78,8 +78,8 @@ class Commands(commands.Cog):
     async def get_player_stats(
         self, 
         inter: disnake.ApplicationCommandInteraction,
-        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
+        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         champion: str = commands.Param(default=None),
         sort_by: str = commands.Param(
             choices=["champion_games", "winrate", "kda", "dpm", "time_dead", "pentas"],
@@ -156,9 +156,9 @@ class Commands(commands.Cog):
     async def compare_players(
         self, 
         inter: disnake.ApplicationCommandInteraction,
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
         username1: str = commands.Param(autocomplete=_autocomplete_wrapper),
         username2: str = commands.Param(autocomplete=_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
         champion: str = commands.Param(default=None)
     ):
         """
@@ -264,8 +264,8 @@ class Commands(commands.Cog):
     async def generate_card(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
+        summoner_name: str = commands.Param(autocomplete=_autocomplete_wrapper),
         sort_by: str = commands.Param(
             choices=["champion games", "winrate", "kda", "dpm", "time dead", "pentas"],
             default="champion games",
@@ -326,8 +326,9 @@ class Commands(commands.Cog):
     async def generate_champion_card(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        champion: str = commands.Param(autocomplete=_champion_autocomplete_wrapper),
-        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"])
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
+        champion: str = commands.Param(autocomplete=_champion_autocomplete_wrapper)
+
     ):
         """
         Generate a champion card with stats

@@ -725,8 +725,9 @@ class DatabaseOperations(commands.Cog):
         """Get all champion names from the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT name FROM champions ORDER BY name')
-        names = [row[0] for row in cursor.fetchall()]
+        cursor.execute('SELECT image_full FROM champions ORDER BY name')
+        #remove .png from the end of the string
+        names = [row[0].replace('.png', '') for row in cursor.fetchall()]
         conn.close()
         return names
 

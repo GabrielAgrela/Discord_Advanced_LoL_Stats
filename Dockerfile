@@ -36,9 +36,6 @@ RUN playwright install chromium
 
 COPY . .
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
-
 # Add src to Python path
 ENV PYTHONPATH=/app
 

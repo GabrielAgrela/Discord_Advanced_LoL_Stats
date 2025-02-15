@@ -382,7 +382,7 @@ class DatabaseOperations(commands.Cog):
         ) for row in results]
 
     async def get_champion(self, id) -> Optional[str]:
-        url = "https://ddragon.leagueoflegends.com/cdn/14.24.1/data/en_US/champion.json"
+        url = "https://ddragon.leagueoflegends.com/cdn/15.2.1/data/en_US/champion.json"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 data = await response.json()

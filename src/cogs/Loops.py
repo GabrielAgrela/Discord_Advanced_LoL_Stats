@@ -61,7 +61,7 @@ class Loops(commands.Cog):
 
                     try:
                         game_data = await self.bot.get_cog("RiotAPIOperations").get_current_game(user.puuid)
-                        if game_data:
+                        if game_data and game_data['gameId']:  # Only process if game_data is not None
                             game_id = str(game_data['gameId'])
                             current_game_ids.add(game_id)
                             

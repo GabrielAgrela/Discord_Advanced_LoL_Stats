@@ -266,7 +266,6 @@ class RiotAPIOperations(commands.Cog):
                     description=final_description,
                     color=final_color
                 ))
-                await asyncio.sleep(60)
                 await inter.delete_original_message()
             elif status_message:
                 await status_message.edit(embed=disnake.Embed(

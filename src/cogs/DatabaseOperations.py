@@ -730,6 +730,60 @@ class DatabaseOperations(commands.Cog):
         names = [row[0].replace('.png', '') for row in cursor.fetchall()]
         conn.close()
         return names
+        
+    async def get_match_info(self, match_id: str) -> tuple:
+        """Get basic match information from the database.
+        
+        Args:
+            match_id: The match ID to retrieve
+            
+        Returns:
+            Tuple containing (game_mode, game_duration, game_end)
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT game_mode, game_duration, game_end
+            FROM matches
+            WHERE match_id = ?
+        ''', (match_id,))
+        match_info = cursor.fetchone()
+        conn.close()
+        return match_info
+        
+    async def get_match_participants(self, match_id: str) -> list:
+        """Get all participants data for a specific match.
+        
+        Args:
+            match_id: The match ID to retrieve participants for
+            
+        Returns:
+            List of dictionaries containing participant data
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row  # This makes fetchall() return dictionaries
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT 
+                p.riot_id_game_name, p.champion_name, p.team_id, p.wins,
+                p.kills, p.deaths, p.assists, p.total_damage_to_champions,
+                p.vision_score, p.gold_earned, p.total_minions_killed,
+                p.total_time_spent_dead, p.largest_killing_spree,
+                p.largest_multi_kill, p.penta_kills, p.profile_icon,
+                p.puuid, p.summoner_level, p.kda, p.kill_participation,
+                p.total_damage_dealt, p.damage_self_mitigated,
+                p.total_heal, p.total_heals_on_teammates,
+                p.total_damage_shielded_on_teammates
+            FROM participants p
+            WHERE p.match_id = ?
+            ORDER BY p.team_id, p.total_damage_to_champions DESC
+        ''', (match_id,))
+        participants_data = cursor.fetchall()
+        
+        # Convert sqlite3.Row objects to dictionaries
+        result = [dict(row) for row in participants_data]
+        conn.close()
+        return result
 
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

@@ -5,6 +5,7 @@ import asyncio
 from disnake.ext import commands
 import disnake
 import psutil
+import datetime
 
 class Loops(commands.Cog):
     def __init__(self, bot):
@@ -46,9 +47,10 @@ class Loops(commands.Cog):
                 continue
 
     async def check_if_in_game(self):
-        """Checks if tracked users are in game and announces their games."""
+       
         while True:
             try:
+                """Checks if tracked users are in game and announces their games."""
                 users = await self.bot.get_cog("DatabaseOperations").get_users(active="TRUE")
                 processed_users = set()  # Keep track of processed users
                 current_game_ids = set()  # Track current active game IDs
@@ -114,15 +116,94 @@ class Loops(commands.Cog):
                             channel = await self.bot.fetch_channel(message_info['channel_id'])
                             message = await channel.fetch_message(message_info['message_id'])
                             await message.edit(embed=disnake.Embed(
-                                title="🎮 Game Over - Deleting in 30 seconds",
-                                color=disnake.Color.red()
+                                title="🎮 Game Over - Updating Database...",
+                                description="Please wait while we update match data...",
+                                color=disnake.Color.gold()
                             ))
-                            self.bot.loop.create_task(self.bot.get_cog("RiotAPIOperations").update_database(announce=True))
-                            await asyncio.sleep(30)
+                            
+                            # First update database with new match data and wait for it to complete
+                            # This is crucial - we need to await this call to ensure the database is updated
+                            update_result = await self.bot.get_cog("RiotAPIOperations").update_database(announce=True)
+                            
+                            # Update the message to show we're now generating cards
+                            await message.edit(embed=disnake.Embed(
+                                title="🎮 Game Over - Generating Stats...",
+                                description=f"Database updated with {update_result} new matches. Generating player cards...",
+                                color=disnake.Color.gold()
+                            ))
+                            
+                            # Then generate finished game card
+                            try:
+                                # Ensure game_id includes the server prefix (e.g., "EUW1_" + game_id)
+                                # The match ID should be prefixed with the region for the Riot API
+                                match_region = self.bot.get_cog("RiotAPIOperations").ACCOUNT_REGION.upper()
+                                full_game_id = f"{match_region}_{game_id}" if not game_id.startswith(f"{match_region}_") else game_id
+                                
+                                player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
+                                
+                                #first send an embed with the game type, players and the date
+                                # Get match information from the database
+                                match_info = await self.bot.get_cog("DatabaseOperations").get_match_info(full_game_id)
+                                match_participants = await self.bot.get_cog("DatabaseOperations").get_match_participants(full_game_id)
+                                
+                                if match_info and match_participants:
+                                    game_mode = match_info[0]
+                                    game_end_date = match_info[2]
+                                    
+                                    # Get tracked users from the database
+                                    tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
+                                    tracked_puuids = {user.puuid for user in tracked_users}
+                                    
+                                    # Filter participants to only include tracked users
+                                    tracked_participants = []
+                                    for player in match_participants:
+                                        if player['puuid'] in tracked_puuids:
+                                            tracked_participants.append(f"{player['riot_id_game_name']} ({player['champion_name']})")
+                                    
+                                    # Create the embed
+                                    embed = disnake.Embed(
+                                        title=f"Match Summary: {game_mode}",
+                                        description="Tracked players in this match:",
+                                        color=disnake.Color.blue()
+                                    )
+                                    
+                                    # Add timestamp
+                                    embed.timestamp = datetime.datetime.fromisoformat(game_end_date)
+                                    
+                                    # Add tracked players field
+                                    if tracked_participants:
+                                        embed.add_field(
+                                            name="Players",
+                                            value="\n".join(tracked_participants),
+                                            inline=False
+                                        )
+                                    else:
+                                        embed.add_field(
+                                            name="Players",
+                                            value="No tracked players found in this match",
+                                            inline=False
+                                        )
+                                    
+                                    # Send the match summary embed
+                                    await channel.send(embed=embed)
+                                
+                                # Send a message for each player card
+                                for card in player_cards:
+                                    await channel.send(file=card)
+                            except Exception as e:
+                                print(f"Error generating finished game card for game {game_id}: {e}")
+                                await channel.send(embed=disnake.Embed(
+                                    title="❌ Error Generating Game Stats",
+                                    description=f"Could not generate game stats: {str(e)}",
+                                    color=disnake.Color.red()
+                                ))
+                            
+                            # Delete the original message after a delay
+                            await asyncio.sleep(5)
                             await message.delete()
                         except Exception as e:
-                            print(f"Error deleting message for game {game_id}: {e}")
-                            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error deleting message for game {game_id}: {e}")
+                            print(f"Error processing finished game {game_id}: {e}")
+                            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error processing finished game {game_id}: {e}")
                         games_to_remove.append(game_id)
                 
                 for game_id in games_to_remove:

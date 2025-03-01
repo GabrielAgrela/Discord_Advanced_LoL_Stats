@@ -703,7 +703,8 @@ class CardGenerator(commands.Cog):
                     premades.append({
                         'name': other_player['name'],
                         'champion': other_player['champion'],
-                        'champion_icon': other_player.get('champion_icon', '')
+                        'champion_icon': other_player.get('champion_icon', ''),
+                        'profile_icon': other_player.get('profile_icon_img', '')
                     })
             
             # Add premades to player data

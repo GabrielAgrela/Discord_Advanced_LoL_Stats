@@ -414,12 +414,16 @@ class CardGenerator(commands.Cog):
         if not match_info:
             raise ValueError(f"Match with game_id {game_id} not found in database")
         
-        gamemode, game_duration, game_end = match_info
+        gamemode, game_duration, game_end, game_creation = match_info
         
         # Get all participants data
         participants = await db_ops.get_match_participants(game_id)
         if not participants:
             raise ValueError(f"No participants found for game_id {game_id}")
+        
+        # Add game_duration to each participant
+        for p in participants:
+            p['game_duration'] = game_duration
         
         # Get tracked users from database
         tracked_users = await db_ops.get_users()
@@ -682,9 +686,10 @@ class CardGenerator(commands.Cog):
                     'cs': p.get('total_minions_killed', 0),
                     'gold': p.get('gold_earned', 0),
                     'damage_mitigated': p.get('damage_mitigated', 0),
-                    'time_dead_pct': p.get('time_dead_pct', 0)
+                    'time_dead_pct': p.get('time_dead_pct', 0),
+                    'gamemode': gamemode
                 }
-                p['insights'] = self._generate_champion_insights(player_data, player_stat)
+                p['insights'] = await self._generate_champion_insights(player_data, player_stat)
                 
                 tracked_players.append(p)
         
@@ -709,10 +714,7 @@ class CardGenerator(commands.Cog):
         seconds = game_duration % 60
         formatted_duration = f"{minutes}:{seconds:02d}"
         
-        # Get a background image based on the most played champion
-        background_image = await self._get_background_image(participants)
-        
-        # Replace with gamemode-based background
+        # Define gamemode-based background images
         gamemode_backgrounds = {
             "CLASSIC": "CLASSIC.png",
             "ARAM": "ARAM.png",
@@ -726,20 +728,23 @@ class CardGenerator(commands.Cog):
         
         # Default to Summoner's Rift if gamemode not found
         background_file = gamemode_backgrounds.get(gamemode, "CLASSIC.png")
-        background_path = os.path.join("src", "assets", "images", background_file)
+        background_path = os.path.join(self.assets_path, "images", background_file)
         
+        # Read and encode background image
         try:
             with open(background_path, "rb") as img_file:
                 background_image = base64.b64encode(img_file.read()).decode('utf-8')
         except FileNotFoundError:
-            # Fallback to champion background if file not found
-            background_image = await self._get_background_image(participants)
+            # If file not found, set background_image to None
+            print(f"Warning: Could not find background image for gamemode {gamemode}")
+            background_image = None
         
         # Prepare theme colors
-        theme = {
-            'primary': '#e5c100',  # Gold
-            'secondary': '#3498db'  # Blue
-        }
+        theme = self.gamemode_themes.get(gamemode, {
+            'primary': 'rgb(86, 171, 47)',      # Default to forest green
+            'overlay_start': 'rgba(35, 46, 32, 0.9)',
+            'overlay_end': 'rgba(24, 31, 22, 0.95)'
+        })
         
         # List to store individual player cards
         player_cards = []
@@ -820,7 +825,7 @@ class CardGenerator(commands.Cog):
         else:
             return 'neutral'
 
-    def _generate_champion_insights(self, player, player_stat, champion_stats=None):
+    async def _generate_champion_insights(self, player, player_stat, champion_stats=None):
         """Generate insights for a player based on their performance compared to champion averages."""
         insights = []
         
@@ -837,6 +842,17 @@ class CardGenerator(commands.Cog):
         
         # Get champion name
         champion_name = player.get('champion', 'this champion')
+        
+        # Try to get global champion stats if available
+        db_ops = self.bot.get_cog("DatabaseOperations")
+        gamemode = player.get('gamemode', 'CLASSIC')
+        global_champion_stats = None
+        
+        if db_ops and champion_name:
+            try:
+                global_champion_stats = await db_ops.get_champion_global_stats(champion_name, gamemode)
+            except Exception as e:
+                print(f"Error getting global champion stats: {e}")
         
         # Check if this is one of their first games on this champion
         champion_games = getattr(champion_stats, 'champion_games', 0) if champion_specific else 0
@@ -857,28 +873,38 @@ class CardGenerator(commands.Cog):
                 'text': 'Perfect game with no deaths!'
             })
         
-        avg_kda = getattr(champion_stats, 'average_kda', 2.5) if champion_specific else getattr(player_stat, 'average_kda', 2.5)
+        # Use global stats if available, otherwise fall back to player stats
+        if global_champion_stats:
+            avg_kda = getattr(global_champion_stats, 'average_kda', 2.5)
+            avg_dpm = getattr(global_champion_stats, 'avg_damage_per_minute', 500)
+            avg_kp = getattr(global_champion_stats, 'avg_kill_participation', 50)
+            avg_time_dead = getattr(global_champion_stats, 'avg_time_dead_pct', 15)
+            avg_cs_per_min = getattr(global_champion_stats, 'avg_cs_per_min', 5)
+            avg_gold_per_min = getattr(global_champion_stats, 'avg_gold_per_min', 350)
+            comparison_text = f"the average for {champion_name} in this game mode"
+        else:
+            avg_kda = getattr(champion_stats, 'average_kda', 2.5) if champion_specific else getattr(player_stat, 'average_kda', 2.5)
+            avg_dpm = getattr(champion_stats, 'avg_damage_per_minute', 500) if champion_specific else getattr(player_stat, 'avg_damage_per_minute', 500)
+            avg_kp = getattr(champion_stats, 'avg_kill_participation', 50) if champion_specific else getattr(player_stat, 'avg_kp', 50)
+            avg_time_dead = getattr(champion_stats, 'avg_time_dead_pct', 15) if champion_specific else getattr(player_stat, 'avg_time_dead_pct', 15)
+            avg_cs_per_min = getattr(champion_stats, 'avg_cs_per_min', 5) if champion_specific else getattr(player_stat, 'avg_cs_per_min', 5)
+            avg_gold_per_min = getattr(champion_stats, 'avg_gold_per_min', 350) if champion_specific else getattr(player_stat, 'avg_gold_per_min', 350)
+            comparison_text = f"your average with {champion_name}" if champion_specific else "your overall average"
+        
         kda_diff = kda - avg_kda
         kda_percent = (kda / avg_kda - 1) * 100 if avg_kda > 0 else 0
         
         if kda > avg_kda * 1.5 and kda > 3:
-            if champion_specific and champion_games > 2:
-                insights.append({
-                    'type': 'positive',
-                    'icon': 'fas fa-chart-line',
-                    'text': f'Exceptional KDA of {kda:.2f}, {kda_percent:.1f}% above your average with {champion_name}!'
-                })
-            else:
-                insights.append({
-                    'type': 'positive',
-                    'icon': 'fas fa-chart-line',
-                    'text': f'Exceptional KDA of {kda:.2f}, well above your overall average of {avg_kda:.2f}!'
-                })
+            insights.append({
+                'type': 'positive',
+                'icon': 'fas fa-chart-line',
+                'text': f'Exceptional KDA of {kda:.2f}, {kda_percent:.1f}% above {comparison_text}!'
+            })
         elif kda_diff < -1 and champion_games > 2 and champion_specific:
             insights.append({
                 'type': 'negative',
                 'icon': 'fas fa-arrow-down',
-                'text': f'KDA of {kda:.2f} is {-kda_percent:.1f}% below your usual {avg_kda:.2f} with {champion_name}.'
+                'text': f'KDA of {kda:.2f} is {-kda_percent:.1f}% below {comparison_text}.'
             })
         
         # Damage insights
@@ -887,48 +913,32 @@ class CardGenerator(commands.Cog):
         game_duration = player.get('game_duration', 1800)
         game_duration_minutes = game_duration / 60
         
-        # Calculate average DPM from avg_damage_per_minute
-        avg_dpm = getattr(champion_stats, 'avg_damage_per_minute', 500) if champion_specific else getattr(player_stat, 'avg_damage_per_minute', 500)
-        
         dpm_diff = dpm - avg_dpm
         dpm_percent = (dpm / avg_dpm - 1) * 100 if avg_dpm > 0 else 0
         
         if dpm_percent > 30 and dpm > 150:  # Adjusted threshold for DPM
-            if champion_specific and champion_games > 2:
-                insights.append({
-                    'type': 'positive',
-                    'icon': 'fas fa-fire',
-                    'text': f'Dealt {dpm:,} DPM, {dpm_percent:.1f}% higher than your average with {champion_name}!'
-                })
-            else:
-                insights.append({
-                    'type': 'positive',
-                    'icon': 'fas fa-fire',
-                    'text': f'Dealt {dpm:,} DPM, significantly higher than your average!'
-                })
+            insights.append({
+                'type': 'positive',
+                'icon': 'fas fa-fire',
+                'text': f'Dealt {dpm:,} DPM, {dpm_percent:.1f}% higher than {comparison_text}!'
+            })
         elif dpm_percent < -25 and champion_games > 2 and champion_specific:
             insights.append({
                 'type': 'negative',
                 'icon': 'fas fa-fire-extinguisher',
-                'text': f'DPM output was {-dpm_percent:.1f}% lower than your usual performance with {champion_name}.'
+                'text': f'DPM output was {-dpm_percent:.1f}% lower than {comparison_text}.'
             })
         
         # Kill participation insights
         kill_participation = player.get('kill_participation', 0)
-        avg_kp = getattr(champion_stats, 'avg_kill_participation', 50) if champion_specific else getattr(player_stat, 'avg_kp', 50)
         kp_diff = kill_participation - avg_kp
+        kp_percent = (kill_participation / avg_kp - 1) * 100 if avg_kp > 0 else 0
         
-        if kill_participation > 70:
-            insights.append({
-                'type': 'positive',
-                'icon': 'fas fa-users',
-                'text': f'Excellent team involvement with {kill_participation:.1f}% kill participation!'
-            })
-        elif kp_diff > 15 and champion_specific and champion_games > 2:
+        if kp_diff > 15:
             insights.append({
                 'type': 'positive',
                 'icon': 'fas fa-handshake',
-                'text': f'Your kill participation was {kp_diff:.1f}% higher than your average with {champion_name}.'
+                'text': f'Your kill participation was {kp_diff:.1f}% higher than {comparison_text}.'
             })
         elif kp_diff < -15 and champion_games > 2 and champion_specific:
             insights.append({
@@ -950,38 +960,26 @@ class CardGenerator(commands.Cog):
         normalized_efficiency = min(100, combat_efficiency / 1000)
         
         # Get average combat efficiency for comparison
-        avg_damage = getattr(champion_stats, 'avg_damage_per_minute', 500) * game_duration_minutes if champion_specific else getattr(player_stat, 'avg_damage_per_minute', 500) * game_duration_minutes
-        avg_mitigated = getattr(champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if champion_specific else getattr(player_stat, 'avg_damage_taken_per_min', 500) * game_duration_minutes
-        avg_time_dead = getattr(champion_stats, 'avg_time_dead_pct', 15) if champion_specific else getattr(player_stat, 'avg_time_dead_pct', 15)
+        avg_damage = avg_dpm * game_duration_minutes
+        avg_mitigated = getattr(global_champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if global_champion_stats else (getattr(champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if champion_specific else getattr(player_stat, 'avg_damage_taken_per_min', 500) * game_duration_minutes)
         
         avg_combat_efficiency = (avg_damage + avg_mitigated) / (1 + avg_time_dead/10) if avg_time_dead > 0 else avg_damage + avg_mitigated
         avg_normalized_efficiency = min(100, avg_combat_efficiency / 1000)
         
         efficiency_diff = normalized_efficiency - avg_normalized_efficiency
+        efficiency_percent = (normalized_efficiency / avg_normalized_efficiency - 1) * 100 if avg_normalized_efficiency > 0 else 0
         
-        if normalized_efficiency > 60:
+        if efficiency_diff > 10:
             insights.append({
                 'type': 'positive',
                 'icon': 'fas fa-fist-raised',
-                'text': f'Exceptional combat efficiency! You maximized damage while minimizing time spent dead.'
-            })
-        elif normalized_efficiency > 40:
-            insights.append({
-                'type': 'positive',
-                'icon': 'fas fa-fist-raised',
-                'text': f'Great combat efficiency! Good balance of damage output and survivability.'
-            })
-        elif efficiency_diff > 10 and champion_specific and champion_games > 2:
-            insights.append({
-                'type': 'positive',
-                'icon': 'fas fa-fist-raised',
-                'text': f'Your combat efficiency was {efficiency_diff:.1f} points higher than your average with {champion_name}.'
+                'text': f'Your combat efficiency was {efficiency_percent:.1f}% higher than {comparison_text}.'
             })
         elif efficiency_diff < -10 and champion_games > 2 and champion_specific:
             insights.append({
                 'type': 'negative',
                 'icon': 'fas fa-dizzy',
-                'text': f'Combat efficiency was lower than your usual performance with {champion_name}.'
+                'text': f'Combat efficiency was lower than {comparison_text}.'
             })
         elif time_dead_pct < 5 and damage_dealt > avg_damage * 1.2:
             insights.append({
@@ -998,47 +996,34 @@ class CardGenerator(commands.Cog):
         
         # CS insights
         cs = player.get('cs', 0)
-        game_duration_minutes = game_duration / 60
-        avg_cs_per_min = getattr(champion_stats, 'avg_cs_per_minute', 5) if champion_specific else getattr(player_stat, 'avg_cs_per_min', 5)
         cs_per_min = cs / game_duration_minutes if game_duration_minutes > 0 else 0
         cs_diff = cs_per_min - avg_cs_per_min
+        cs_percent = (cs_per_min / avg_cs_per_min - 1) * 100 if avg_cs_per_min > 0 else 0
         
-        if cs_per_min > 8:
+        if cs_diff > 1:
             insights.append({
                 'type': 'positive',
                 'icon': 'fas fa-coins',
-                'text': f'Excellent farming with {cs_per_min:.1f} CS per minute!'
-            })
-        elif cs_diff > 1 and champion_specific and champion_games > 2:
-            insights.append({
-                'type': 'positive',
-                'icon': 'fas fa-coins',
-                'text': f'CS per minute was {cs_diff:.1f} higher than your average with {champion_name}.'
+                'text': f'CS per minute was {cs_percent:.1f}% higher than {comparison_text}.'
             })
         elif cs_diff < -1.5 and champion_games > 2 and champion_specific:
             insights.append({
                 'type': 'negative',
                 'icon': 'fas fa-coins',
-                'text': f'Farming efficiency was lower than your usual performance with {champion_name}.'
+                'text': f'Farming efficiency was lower than {comparison_text}.'
             })
         
         # Gold insights
         gold = player.get('gold', 0)
-        avg_gold_per_min = getattr(champion_stats, 'avg_gold_per_minute', 350) if champion_specific else getattr(player_stat, 'avg_gold_per_min', 350)
         gold_per_min = gold / game_duration_minutes if game_duration_minutes > 0 else 0
         gold_diff = gold_per_min - avg_gold_per_min
+        gold_percent = (gold_per_min / avg_gold_per_min - 1) * 100 if avg_gold_per_min > 0 else 0
         
-        if gold_per_min > 500:
+        if gold_diff > 50:
             insights.append({
                 'type': 'positive',
                 'icon': 'fas fa-money-bill-wave',
-                'text': f'Exceptional gold income with {gold_per_min:.1f} gold per minute!'
-            })
-        elif gold_diff > 50 and champion_specific and champion_games > 2:
-            insights.append({
-                'type': 'positive',
-                'icon': 'fas fa-money-bill-wave',
-                'text': f'Gold income was {gold_diff:.1f} per minute higher than your average with {champion_name}.'
+                'text': f'Gold income was {gold_percent:.1f}% per minute higher than {comparison_text}.'
             })
         
         # Personal record insights
@@ -1218,38 +1203,6 @@ class CardGenerator(commands.Cog):
             
             # Return as discord file
             return disnake.File(fp=output, filename='champion_card.png')
-
-    async def _get_background_image(self, participants):
-        """Get a background image based on the most played champion in the match."""
-        # Count champion occurrences
-        champion_counts = {}
-        for p in participants:
-            # Safely get champion name with a default value if missing
-            champion = p.get('champion', '')
-            if champion:  # Only count if champion name is not empty
-                champion_counts[champion] = champion_counts.get(champion, 0) + 1
-        
-        # Get the most played champion if any champions were found
-        if champion_counts:
-            most_played_champion = max(champion_counts.items(), key=lambda x: x[1])[0]
-            
-            # Try to load the champion splash art using the load_champion_image method
-            try:
-                return self.load_champion_image(most_played_champion, "splash")
-            except ValueError:
-                pass  # Continue to fallback if loading fails
-        
-        # Fallback to Zed as default background
-        try:
-            return self.load_champion_image("Zed", "splash")
-        except ValueError:
-            # Ultimate fallback if even the Zed splash is missing
-            try:
-                with open(os.path.join(self.assets_path, "images", "default_background.jpg"), "rb") as img_file:
-                    return base64.b64encode(img_file.read()).decode('utf-8')
-            except FileNotFoundError:
-                print("Warning: Default background images not found")
-                return ""
 
 def setup(bot):
     bot.add_cog(CardGenerator(bot)) 

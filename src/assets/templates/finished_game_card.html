@@ -122,12 +122,15 @@
         }
         .player-banner {
             position: relative;
-            height: 200px;
+            height: auto;
+            min-height: 200px;
+            max-height: 250px;
             background-size: cover;
             background-position: center;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             padding: 20px;
+            overflow: visible;
         }
         .player-banner::before {
             content: '';
@@ -152,7 +155,7 @@
         }
         .player-info-row {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             width: 100%;
         }
         .champion-splash {
@@ -186,6 +189,9 @@
         }
         .player-name-container {
             z-index: 2;
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
         }
         .player-name {
             font-family: 'BeaufortforLOL', sans-serif;
@@ -199,7 +205,7 @@
             font-size: 16px;
             font-weight: bold;
             margin-top: 3px;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
         .result-victory {
             color: #4ecca3;
@@ -208,40 +214,47 @@
             color: #e74c3c;
         }
         .tracked-players {
-            font-size: 13px;
-            margin-top: 5px;
+            font-size: 11px;
+            margin-top: 3px;
             color: rgba(255, 255, 255, 0.9);
-            max-width: 500px;
-            overflow: hidden;
+            max-width: fit-content;
             background: rgba(0, 0, 0, 0.6);
             border-radius: 6px;
-            padding: 8px;
+            padding: 3px 5px;
             border: 1px solid rgba(229, 193, 0, 0.3);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             align-self: flex-start;
             margin-left: 0;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            max-width: 300px;
         }
         .tracked-label {
             color: #e5c100;
             font-weight: bold;
-            margin-right: 8px;
-            margin-bottom: 5px;
-            display: block;
+            margin-right: 4px;
+            display: inline;
         }
         .tracked-player {
             color: #ffffff;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            margin: 3px 0;
-            padding: 2px 0;
+            margin: 1px 2px 1px 0;
+            padding: 1px 3px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 3px;
+            white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .tracked-champion-icon {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            margin-right: 4px;
+            margin-right: 2px;
             vertical-align: middle;
             border: 1px solid rgba(229, 193, 0, 0.5);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -462,8 +475,8 @@
                                         <span class="tracked-label">Premade with:</span>
                                         {% for premade in player.premades %}
                                         <span class="tracked-player">
-                                            {% if premade.champion_icon %}
-                                            <img src="data:image/jpeg;base64,{{premade.champion_icon}}" class="tracked-champion-icon" alt="{{ premade.champion }}">
+                                            {% if premade.profile_icon %}
+                                            <img src="https://ddragon.leagueoflegends.com/cdn/15.2.1/img/profileicon/{{premade.profile_icon}}.png" class="tracked-champion-icon" alt="{{ premade.name }}">
                                             {% endif %}
                                             {{ premade.name }}
                                         </span>

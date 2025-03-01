@@ -65,6 +65,7 @@ class DatabaseOperations(commands.Cog):
                 SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as total_first_bloods,
                 SUM(turret_takedowns + inhibitor_takedowns) as total_objectives,
                 ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as avg_gold_per_min,
+                ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as avg_cs_per_min,
                 MAX(largest_killing_spree) as max_killing_spree,
                 MAX(CASE 
                     WHEN deaths = 0 THEN kills + assists 
@@ -83,6 +84,7 @@ class DatabaseOperations(commands.Cog):
                 SUM(turret_takedowns + inhibitor_takedowns) as overall_objectives,
                 ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as overall_gold_per_min,
                 ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as overall_damage_taken_per_min,
+                ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as overall_cs_per_min,
                 MAX(CASE 
                     WHEN deaths = 0 THEN kills + assists 
                     ELSE CAST((kills + assists) AS FLOAT) / deaths 
@@ -118,6 +120,7 @@ class DatabaseOperations(commands.Cog):
             (SELECT overall_first_bloods FROM overall_stats) as total_first_bloods,
             (SELECT overall_objectives FROM overall_stats) as total_objectives,
             (SELECT overall_gold_per_min FROM overall_stats) as avg_gold_per_min,
+            avg_cs_per_min,
             (SELECT overall_max_killing_spree FROM overall_stats) as max_killing_spree,
             (SELECT overall_max_kda FROM overall_stats) as max_kda,
             (SELECT max_killing_spree_champion FROM overall_stats) as max_killing_spree_champion,
@@ -186,10 +189,11 @@ class DatabaseOperations(commands.Cog):
                 total_first_bloods=row[19],
                 total_objectives=row[20],
                 avg_gold_per_min=row[21],
-                max_killing_spree=row[22],
-                max_kda=row[23],
-                max_killing_spree_champion=row[24],
-                max_kda_champion=row[25],
+                avg_cs_per_min=row[22],
+                max_killing_spree=row[23],
+                max_kda=row[24],
+                max_killing_spree_champion=row[25],
+                max_kda_champion=row[26],
                 summoner_level=latest_info[0] if latest_info else 0,
                 profile_icon=latest_info[1] if latest_info else 0
             ))
@@ -218,6 +222,7 @@ class DatabaseOperations(commands.Cog):
                 total_first_bloods=0,
                 total_objectives=0,
                 avg_gold_per_min=0.0,
+                avg_cs_per_min=0.0,
                 max_killing_spree=0,
                 max_kda=0.0,
                 max_killing_spree_champion="",
@@ -743,7 +748,7 @@ class DatabaseOperations(commands.Cog):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT game_mode, game_duration, game_end
+            SELECT game_mode, game_duration, game_end, game_creation
             FROM matches
             WHERE match_id = ?
         ''', (match_id,))
@@ -784,6 +789,98 @@ class DatabaseOperations(commands.Cog):
         result = [dict(row) for row in participants_data]
         conn.close()
         return result
+
+    async def get_champion_global_stats(self, champion_name, gamemode) -> Optional[PlayerStats]:
+        """Get global average statistics for a specific champion in a specific gamemode.
+        
+        Args:
+            champion_name: The champion name to get stats for
+            gamemode: The game mode to filter by
+            
+        Returns:
+            PlayerStats object with average statistics across all players
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        query = '''
+        WITH champion_data AS (
+            SELECT p.*, m.game_duration, m.game_creation
+            FROM participants p
+            JOIN matches m ON p.match_id = m.match_id
+            WHERE LOWER(p.champion_name) = LOWER(?)
+            AND LOWER(m.game_mode) = LOWER(?)
+        )
+        SELECT 
+            champion_name,
+            COUNT(*) as champion_games,
+            ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) as winrate,
+            ROUND(AVG(total_damage_to_champions / (game_duration / 60.0)), 0) as avg_damage_per_minute,
+            ROUND(AVG(CASE 
+                WHEN deaths = 0 THEN kills + assists 
+                ELSE CAST((kills + assists) AS FLOAT) / deaths 
+            END), 2) as average_kda,
+            ROUND(AVG(CAST(kills AS FLOAT)), 1) as avg_kills,
+            ROUND(AVG(CAST(deaths AS FLOAT)), 1) as avg_deaths,
+            ROUND(AVG(CAST(assists AS FLOAT)), 1) as avg_assists,
+            SUM(triple_kills) as total_triples,
+            SUM(quadra_kills) as total_quadras,
+            SUM(penta_kills) as total_pentas,
+            ROUND(AVG(CAST(total_time_spent_dead AS FLOAT) / game_duration * 100), 1) as avg_time_dead_pct,
+            ROUND(AVG(vision_score), 1) as avg_vision_score,
+            ROUND(AVG(kill_participation * 100), 1) as avg_kill_participation,
+            ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as avg_damage_taken_per_min,
+            SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as total_first_bloods,
+            SUM(turret_takedowns + inhibitor_takedowns) as total_objectives,
+            ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as avg_gold_per_min,
+            ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as avg_cs_per_min,
+            MAX(largest_killing_spree) as max_killing_spree,
+            MAX(CASE 
+                WHEN deaths = 0 THEN kills + assists 
+                ELSE CAST((kills + assists) AS FLOAT) / deaths 
+            END) as max_kda
+        FROM champion_data
+        GROUP BY champion_name
+        '''
+        
+        cursor.execute(query, (champion_name, gamemode))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return None
+            
+        return PlayerStats(
+            champion_name=result[0],
+            champion_games=result[1],
+            winrate=result[2],
+            avg_damage_per_minute=result[3],
+            average_kda=result[4],
+            total_games_overall=result[1],  # Same as champion_games for global stats
+            unique_champions_played=1,  # Only one champion
+            unique_champ_ratio=100.0,  # 100% since only one champion
+            oldest_game="",  # Not relevant for global stats
+            total_hours_played=0.0,  # Not calculated for global stats
+            total_triples=result[8],
+            total_quadras=result[9],
+            total_pentas=result[10],
+            total_pentas_overall=result[10],  # Same as total_pentas for global stats
+            total_winrate=result[2],  # Same as winrate for global stats
+            avg_time_dead_pct=result[11],
+            avg_vision_score=result[12],
+            avg_kill_participation=result[13],
+            avg_damage_taken_per_min=result[14],
+            total_first_bloods=result[15],
+            total_objectives=result[16],
+            avg_gold_per_min=result[17],
+            avg_cs_per_min=result[18],  # New field for CS per minute
+            max_killing_spree=result[19],
+            max_kda=result[20],
+            max_killing_spree_champion=result[0],  # Same as champion_name
+            max_kda_champion=result[0],  # Same as champion_name
+            summoner_level=0,  # Not relevant for global stats
+            profile_icon=0  # Not relevant for global stats
+        )
 
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

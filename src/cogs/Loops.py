@@ -148,7 +148,7 @@ class Loops(commands.Cog):
                                 
                                 if match_info and match_participants:
                                     game_mode = match_info[0]
-                                    game_end_date = match_info[2]
+                                    game_start_date = match_info[3]
                                     
                                     # Get tracked users from the database
                                     tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
@@ -163,12 +163,12 @@ class Loops(commands.Cog):
                                     # Create the embed
                                     embed = disnake.Embed(
                                         title=f"Match Summary: {game_mode}",
-                                        description="Tracked players in this match:",
+                                        description="",
                                         color=disnake.Color.blue()
                                     )
                                     
                                     # Add timestamp
-                                    embed.timestamp = datetime.datetime.fromisoformat(game_end_date)
+                                    embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
                                     
                                     # Add tracked players field
                                     if tracked_participants:

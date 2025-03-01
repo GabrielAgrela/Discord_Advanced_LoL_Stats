@@ -273,7 +273,6 @@ class RiotAPIOperations(commands.Cog):
                     description=final_description,
                     color=final_color
                 ))
-                await asyncio.sleep(60)
                 await status_message.delete()
         
         return total_matches_updated

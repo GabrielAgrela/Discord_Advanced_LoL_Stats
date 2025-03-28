@@ -80,6 +80,10 @@ class RiotAPIOperations(commands.Cog):
                             print(f"Service unavailable. Attempt {attempt + 1}/{max_retries}")
                             await asyncio.sleep(2 ** attempt)  # Exponential backoff
                             continue
+                        elif response.status == 504:
+                            print(f"Timeout. Attempt {attempt + 1}/{max_retries}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
                         elif response.status == 500:
                             print(f"Internal server error. Attempt {attempt + 1}/{max_retries}")
                             await asyncio.sleep(2 ** attempt)  # Exponential backoff

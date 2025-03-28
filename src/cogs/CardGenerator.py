@@ -503,11 +503,11 @@ class CardGenerator(commands.Cog):
                 # Load champion splash art for banner using the load_champion_image method
                 champion = p.get('champion_name', 'Zed')
                 try:
-                    p['champion_splash'] = self.load_champion_image(champion, "splash")
+                    p['champion_splash'] = self.load_champion_image(champion, "centered")
                 except ValueError as e:
                     print(f"Warning: Could not load champion splash for {champion}: {e}")
                     # Try with Zed as fallback
-                    p['champion_splash'] = self.load_champion_image("Zed", "splash")
+                    p['champion_splash'] = self.load_champion_image("Zed", "centered")
                 
                 # Get player stats for comparison
                 player_stats = await db_ops.get_player_stats(p['riot_id_game_name'], gamemode, champion)
@@ -882,6 +882,7 @@ class CardGenerator(commands.Cog):
             avg_time_dead = getattr(global_champion_stats, 'avg_time_dead_pct', 15)
             avg_cs_per_min = getattr(global_champion_stats, 'avg_cs_per_min', 5)
             avg_gold_per_min = getattr(global_champion_stats, 'avg_gold_per_min', 350)
+            avg_dmg_mitigated = getattr(global_champion_stats, 'avg_damage_mitigated', 500)
             comparison_text = f"the average for {champion_name} in this game mode"
         else:
             avg_kda = getattr(champion_stats, 'average_kda', 2.5) if champion_specific else getattr(player_stat, 'average_kda', 2.5)
@@ -964,7 +965,7 @@ class CardGenerator(commands.Cog):
         avg_damage = avg_dpm * game_duration_minutes
         avg_mitigated = getattr(global_champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if global_champion_stats else (getattr(champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if champion_specific else getattr(player_stat, 'avg_damage_taken_per_min', 500) * game_duration_minutes)
         
-        avg_combat_efficiency = (avg_damage + avg_mitigated) / (1 + avg_time_dead/10) if avg_time_dead > 0 else avg_damage + avg_mitigated
+        avg_combat_efficiency = (avg_damage + avg_dmg_mitigated) / (1 + avg_time_dead/10) if avg_time_dead > 0 else avg_damage + avg_dmg_mitigated
         avg_normalized_efficiency = min(100, avg_combat_efficiency / 1000)
         
         efficiency_diff = normalized_efficiency - avg_normalized_efficiency

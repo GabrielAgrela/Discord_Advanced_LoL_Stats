@@ -834,6 +834,7 @@ class DatabaseOperations(commands.Cog):
             SUM(turret_takedowns + inhibitor_takedowns) as total_objectives,
             ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as avg_gold_per_min,
             ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as avg_cs_per_min,
+            ROUND(AVG(damage_self_mitigated), 0) as avg_damage_mitigated,
             MAX(largest_killing_spree) as max_killing_spree,
             MAX(CASE 
                 WHEN deaths = 0 THEN kills + assists 

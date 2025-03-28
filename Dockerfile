@@ -40,6 +40,6 @@ COPY . .
 ENV PYTHONPATH=/app
 
 # Change the CMD to enable debugging
-#CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "src.bot"]
+CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "src.bot"]
 #without debugpy
-CMD ["python", "-m", "src.bot"]
+#CMD ["python", "-m", "src.bot"]

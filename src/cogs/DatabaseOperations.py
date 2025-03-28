@@ -5,6 +5,8 @@ from disnake.ext import commands
 import aiohttp
 from typing import List, Optional, Set, Tuple
 from ..models.models import Match, Participant, User, PlayerStats, PlayerFriendStats, UserStats
+import time
+import datetime
 
 DB_PATH = "/app/data/lol_stats.db"
 
@@ -883,89 +885,169 @@ class DatabaseOperations(commands.Cog):
             profile_icon=0  # Not relevant for global stats
         )
 
-    async def get_leaderboard_kda(self, gamemode: str, guild_id: int, limit: int = 10) -> List[Tuple[str, float, int]]:
-        """Fetches the KDA leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+    async def get_leaderboard_kda(self, gamemode: str, guild_id: int, period: str = "Weekly", limit: int = 10) -> List[Tuple[str, float, int, int]]:
+        """Fetches the KDA leaderboard for the specified period, retrieving the profile icon from the player's latest game in this mode."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        query = """
+        params = [gamemode, gamemode, guild_id] # Base params for subquery and main query
+        where_clauses = [
+            "LOWER(m.game_mode) = LOWER(?)",
+            "u.guild_id = ?",
+            "p.riot_id_game_name IS NOT NULL AND p.riot_id_game_name != '0' AND p.riot_id_game_name != ''"
+        ]
+
+        if period != "All Time":
+            today = datetime.date.today()
+            if period == "Weekly":
+                start_date = today - datetime.timedelta(days=today.weekday())
+            elif period == "Monthly":
+                start_date = today.replace(day=1)
+            else: # Default to weekly if invalid period somehow passed
+                start_date = today - datetime.timedelta(days=today.weekday())
+            
+            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            where_clauses.append("m.game_end >= ?")
+            params.append(start_string)
+
+        query = f"""
         SELECT
             p.riot_id_game_name,
             ROUND(AVG(CASE
                 WHEN p.deaths = 0 THEN p.kills + p.assists
                 ELSE CAST(p.kills + p.assists AS FLOAT) / p.deaths
             END), 2) as average_kda,
-            COUNT(DISTINCT p.match_id) as total_games
+            COUNT(DISTINCT p.match_id) as total_games,
+            (SELECT pp.profile_icon
+             FROM participants pp
+             JOIN matches mm ON pp.match_id = mm.match_id
+             WHERE pp.puuid = p.puuid AND LOWER(mm.game_mode) = LOWER(?)
+             ORDER BY mm.game_end DESC
+             LIMIT 1
+            ) as latest_profile_icon_id
         FROM participants p
         JOIN matches m ON p.match_id = m.match_id
-        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
-        WHERE LOWER(m.game_mode) = LOWER(?)
-          AND u.guild_id = ?                 -- Filter by guild_id
-          AND p.riot_id_game_name IS NOT NULL 
-          AND p.riot_id_game_name != '0' 
-          AND p.riot_id_game_name != ''
-        GROUP BY p.riot_id_game_name
+        INNER JOIN users u ON p.puuid = u.puuid
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY p.puuid, p.riot_id_game_name
         HAVING total_games > 0
         ORDER BY average_kda DESC
         LIMIT ?;
         """
-        cursor.execute(query, (gamemode, guild_id, limit)) # Pass guild_id
+        params.append(limit) # Add limit to the end of params
+        cursor.execute(query, params)
         results = cursor.fetchall()
         conn.close()
-        return results # Returns list of (name, kda, games)
+        return results
 
-    async def get_leaderboard_winrate(self, gamemode: str, guild_id: int, min_games: int = 10, limit: int = 10) -> List[Tuple[str, float, int]]:
-        """Fetches the Win Rate leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+    async def get_leaderboard_winrate(self, gamemode: str, guild_id: int, period: str = "Weekly", min_games: int = 10, limit: int = 10) -> List[Tuple[str, float, int, int]]:
+        """Fetches the Win Rate leaderboard for the specified period, retrieving the profile icon from the player's latest game in this mode."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        query = """
+        params = [gamemode, gamemode, guild_id]
+        where_clauses = [
+            "LOWER(m.game_mode) = LOWER(?)",
+            "u.guild_id = ?",
+            "p.riot_id_game_name IS NOT NULL AND p.riot_id_game_name != '0' AND p.riot_id_game_name != ''"
+        ]
+
+        if period != "All Time":
+            today = datetime.date.today()
+            if period == "Weekly":
+                start_date = today - datetime.timedelta(days=today.weekday())
+            elif period == "Monthly":
+                start_date = today.replace(day=1)
+            else: 
+                start_date = today - datetime.timedelta(days=today.weekday())
+            
+            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            where_clauses.append("m.game_end >= ?")
+            params.append(start_string)
+
+        query = f"""
         SELECT
             p.riot_id_game_name,
             ROUND(AVG(CASE WHEN p.wins = 1 THEN 100.0 ELSE 0 END), 1) as winrate,
-            COUNT(DISTINCT p.match_id) as total_games
+            COUNT(DISTINCT p.match_id) as total_games,
+            (SELECT pp.profile_icon
+             FROM participants pp
+             JOIN matches mm ON pp.match_id = mm.match_id
+             WHERE pp.puuid = p.puuid AND LOWER(mm.game_mode) = LOWER(?)
+             ORDER BY mm.game_end DESC
+             LIMIT 1
+            ) as latest_profile_icon_id
         FROM participants p
         JOIN matches m ON p.match_id = m.match_id
-        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
-        WHERE LOWER(m.game_mode) = LOWER(?)
-          AND u.guild_id = ?                 -- Filter by guild_id
-          AND p.riot_id_game_name IS NOT NULL 
-          AND p.riot_id_game_name != '0' 
-          AND p.riot_id_game_name != ''
-        GROUP BY p.riot_id_game_name
+        INNER JOIN users u ON p.puuid = u.puuid
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY p.puuid, p.riot_id_game_name
         HAVING total_games >= ?
         ORDER BY winrate DESC
         LIMIT ?;
         """
-        cursor.execute(query, (gamemode, guild_id, min_games, limit)) # Pass guild_id
+        params.append(min_games) # Add min_games
+        params.append(limit)     # Add limit
+        cursor.execute(query, params)
         results = cursor.fetchall()
         conn.close()
-        return results # Returns list of (name, winrate, games)
+        return results
 
-    async def get_leaderboard_pentakills(self, gamemode: str, guild_id: int, limit: int = 10) -> List[Tuple[str, int, int]]:
-        """Fetches the Pentakills leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+    async def get_leaderboard_dpm(self, gamemode: str, guild_id: int, period: str = "Weekly", limit: int = 10) -> List[Tuple[str, int, int, int]]:
+        """Fetches the DPM leaderboard for the specified period, retrieving the profile icon from the player's latest game in this mode."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        query = """
+        params = [gamemode, gamemode, guild_id] # Base params for subquery and main query
+        where_clauses = [
+            "LOWER(m.game_mode) = LOWER(?)",
+            "u.guild_id = ?",
+            "p.riot_id_game_name IS NOT NULL AND p.riot_id_game_name != '0' AND p.riot_id_game_name != ''",
+            "m.game_duration > 0" # Ensure game duration is positive to avoid division by zero
+        ]
+
+        if period != "All Time":
+            today = datetime.date.today()
+            if period == "Weekly":
+                start_date = today - datetime.timedelta(days=today.weekday())
+            elif period == "Monthly":
+                start_date = today.replace(day=1)
+            else: # Default to weekly
+                start_date = today - datetime.timedelta(days=today.weekday())
+
+            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            where_clauses.append("m.game_end >= ?")
+            params.append(start_string)
+
+        query = f"""
         SELECT
             p.riot_id_game_name,
-            SUM(p.penta_kills) as total_pentakills,
-            COUNT(DISTINCT p.match_id) as total_games
+            -- Calculate Average DPM (Damage Per Minute)
+            ROUND(AVG(p.total_damage_to_champions / (m.game_duration / 60.0)), 0) as average_dpm,
+            COUNT(DISTINCT p.match_id) as total_games,
+            (SELECT pp.profile_icon
+             FROM participants pp
+             JOIN matches mm ON pp.match_id = mm.match_id
+             WHERE pp.puuid = p.puuid AND LOWER(mm.game_mode) = LOWER(?)
+             ORDER BY mm.game_end DESC
+             LIMIT 1
+            ) as latest_profile_icon_id
         FROM participants p
         JOIN matches m ON p.match_id = m.match_id
-        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
-        WHERE LOWER(m.game_mode) = LOWER(?)
-          AND u.guild_id = ?                 -- Filter by guild_id
-          AND p.riot_id_game_name IS NOT NULL 
-          AND p.riot_id_game_name != '0' 
-          AND p.riot_id_game_name != ''
-        GROUP BY p.riot_id_game_name
-        HAVING total_pentakills > 0
-        ORDER BY total_pentakills DESC
+        INNER JOIN users u ON p.puuid = u.puuid
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY p.puuid, p.riot_id_game_name
+        HAVING total_games > 0 AND average_dpm IS NOT NULL -- Ensure DPM could be calculated
+        ORDER BY average_dpm DESC
         LIMIT ?;
         """
-        cursor.execute(query, (gamemode, guild_id, limit)) # Pass guild_id
+        params.append(limit) # Add limit to the end of params
+        cursor.execute(query, params)
         results = cursor.fetchall()
         conn.close()
-        return results # Returns list of (name, pentakills, games)
+        # Result tuple: (name, dpm, games, latest_profile_icon_id)
+        # Convert DPM to int here
+        return [(name, int(dpm) if dpm is not None else 0, games, icon) for name, dpm, games, icon in results]
 
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

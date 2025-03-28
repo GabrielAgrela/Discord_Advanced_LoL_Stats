@@ -378,78 +378,67 @@ class Commands(commands.Cog):
         self,
         inter: disnake.ApplicationCommandInteraction,
         gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
+        period: str = commands.Param(default="Weekly", choices=["Weekly", "Monthly", "All Time"], description="Time period for stats"),
         limit: int = commands.Param(default=10, min_value=1, max_value=25, description="Number of players to display per board"),
         min_games: int = commands.Param(default=10, min_value=1, description="Minimum games for Win Rate board")
     ):
-        """Displays KDA, Win Rate, and Pentakills leaderboards for tracked players."""
+        """Displays KDA, Win Rate, and Pentakills leaderboards for tracked players as a card."""
         if not await self.bot.is_botlol_channel(inter):
             return
         if not inter.guild:
             await inter.response.send_message("This command can only be used in a server.", ephemeral=True)
             return
 
+        # Use the original gamemode string for card generation theme/background lookup
+        gamemode_raw = gamemode 
         gamemode_translated = translate(gamemode)
         await inter.response.defer() # Defer initial response
         
-        any_data_found = False
         db_cog = self.bot.get_cog("DatabaseOperations")
-        formatter_cog = self.bot.get_cog("DataFormatter")
+        card_gen_cog = self.bot.get_cog("CardGenerator")
 
         try:
-            # --- KDA Leaderboard --- 
+            # Fetch data for all leaderboards, passing the period
             kda_data = await db_cog.get_leaderboard_kda(
-                gamemode_translated, inter.guild.id, limit=limit
+                gamemode_translated, inter.guild.id, period=period, limit=limit
             )
-            if kda_data:
-                any_data_found = True
-                kda_description = await formatter_cog.format_leaderboard_kda(kda_data)
-                kda_embed = disnake.Embed(
-                    title=f"🏆 {inter.guild.name} - {gamemode} KDA Leaderboard (Top {len(kda_data)}) 🏆",
-                    description=kda_description,
-                    color=disnake.Color.gold()
-                )
-                await inter.followup.send(embed=kda_embed) # Send as followup
-            
-            # --- Win Rate Leaderboard --- 
             winrate_data = await db_cog.get_leaderboard_winrate(
-                gamemode_translated, inter.guild.id, min_games=min_games, limit=limit
+                gamemode_translated, inter.guild.id, period=period, min_games=min_games, limit=limit
             )
-            if winrate_data:
-                any_data_found = True
-                winrate_description = await formatter_cog.format_leaderboard_winrate(winrate_data)
-                winrate_embed = disnake.Embed(
-                    title=f"📈 {inter.guild.name} - {gamemode} Win Rate Leaderboard (Top {len(winrate_data)}, Min {min_games} Games) 📈",
-                    description=winrate_description,
-                    color=disnake.Color.green()
-                )
-                await inter.followup.send(embed=winrate_embed) # Send as followup
-                
-            # --- Pentakills Leaderboard --- 
-            pentakills_data = await db_cog.get_leaderboard_pentakills(
-                gamemode_translated, inter.guild.id, limit=limit
+            dpm_data = await db_cog.get_leaderboard_dpm(
+                gamemode_translated, inter.guild.id, period=period, limit=limit
             )
-            if pentakills_data:
-                any_data_found = True
-                pentakills_description = await formatter_cog.format_leaderboard_pentakills(pentakills_data)
-                pentakills_embed = disnake.Embed(
-                    title=f"☠️ {inter.guild.name} - {gamemode} Pentakills Leaderboard (Top {len(pentakills_data)}) ☠️",
-                    description=pentakills_description,
-                    color=disnake.Color.red()
-                )
-                await inter.followup.send(embed=pentakills_embed) # Send as followup
 
-            # --- No Data Message --- 
-            if not any_data_found:
+            # Check if there is any data to display
+            if not kda_data and not winrate_data and not dpm_data:
                  no_data_embed = disnake.Embed(
-                    title=f"{gamemode} Leaderboards",
-                    description=f"No tracked players found with relevant stats in {gamemode} for this server.",
+                    title=f"{inter.guild.name} - {gamemode} Leaderboards ({period})",
+                    description=f"No tracked players found with relevant stats in {gamemode} for this server and period (min {min_games} games for Win Rate).",
                     color=disnake.Color.orange()
                  )
                  await inter.followup.send(embed=no_data_embed)
+                 return
+
+            # Generate the leaderboard card
+            card_file = await card_gen_cog.generate_leaderboard_card(
+                guild_name=inter.guild.name,
+                gamemode=gamemode_raw, # Pass the raw gamemode key
+                limit=limit,
+                min_games=min_games,
+                kda_data=kda_data,
+                winrate_data=winrate_data,
+                dpm_data=dpm_data # Pass dpm_data instead of pentakills_data
+            )
+            
+            # Send the generated card
+            await inter.followup.send(file=card_file)
 
         except Exception as e:
-            print(f"Error in leaderboard: {e}") # Updated error message context
-            await inter.followup.send(f"An error occurred while fetching the leaderboards.")
+            print(f"Error generating leaderboard card: {e}") # Updated error message context
+            # Also log the traceback for more detailed debugging
+            import traceback
+            traceback.print_exc()
+            await inter.followup.send(f"An error occurred while generating the leaderboard card.")
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

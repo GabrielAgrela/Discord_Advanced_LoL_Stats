@@ -405,7 +405,7 @@
                 </div>
                 <div class="col-3">
                     <div class="stats-box">
-                        <div class="stats-value" style="color: rgb{{total_winrate_color}}">{{total_winrate}}%</div>
+                        <div class="stats-value" style="color: rgb({{total_winrate_color}})">{{total_winrate}}%</div>
                         <div class="stats-label">Win Rate</div>
                     </div>
                 </div>
@@ -453,8 +453,8 @@
                                             <img src="data:image/jpeg;base64,{{champ.image}}" class="champion-img">
                                         </td>
                                         <td>{{champ.games}}</td>
-                                        <td style="color: rgb{{champ.winrate_color}}">{{champ.winrate}}%</td>
-                                        <td style="color: rgb{{champ.kda_color}}">{{champ.kda}}</td>
+                                        <td style="color: rgb({{champ.winrate_color}})">{{champ.winrate}}%</td>
+                                        <td style="color: rgb({{champ.kda_color}})">{{champ.kda}}</td>
                                         <td>{{champ.damage_per_min}}</td>
                                         <td>{{champ.avg_time_dead_pct}}</td>
                                         <td>{{champ.pentas}}</td>
@@ -513,7 +513,7 @@
                                                 <div class="stats-value theme-primary">{{champions[0].max_killing_spree}}</div>
                                                 <div class="stats-label">Best Killing Spree</div>
                                             </div>
-                                            <div class="col-5 p-0">
+                                            <div class="col-5 p-0" style="display: flex; align-items: center; justify-content: center;">
                                                 <img src="data:image/jpeg;base64,{{champions[0].max_killing_spree_image}}" class="champion-performancecard-img" alt="{{champions[0].max_killing_spree_champion}}" style="width: 100%; height: 110px; object-fit: cover;">
                                             </div>
                                         </div>
@@ -524,7 +524,7 @@
                                                 <div class="stats-value theme-primary">{{champions[0].max_kda}}</div>
                                                 <div class="stats-label">Best KDA</div>
                                             </div>
-                                            <div class="col-5 p-0">
+                                            <div class="col-5 p-0" style="display: flex; align-items: center; justify-content: center;">
                                                 <img src="data:image/jpeg;base64,{{champions[0].max_kda_image}}" class="champion-performancecard-img" alt="{{champions[0].max_kda_champion}}" style="width: 100%; height: 110px; object-fit: cover;">
                                             </div>
                                         </div>

@@ -168,8 +168,8 @@ class CardGenerator(commands.Cog):
             
             # Read and encode champion images with different types
             encoded_champion_image = self.load_champion_image(stat.champion_name, "centered")
-            max_killing_spree_champion = self.load_champion_image(stat.max_killing_spree_champion, "splash")
-            max_kda_champion = self.load_champion_image(stat.max_kda_champion, "splash")
+            max_killing_spree_champion = self.load_champion_image(stat.max_killing_spree_champion, "centered")
+            max_kda_champion = self.load_champion_image(stat.max_kda_champion, "centered")
             
             champions.append({
                 'name': stat.champion_name[:15],
@@ -1205,6 +1205,154 @@ class CardGenerator(commands.Cog):
             
             # Return as discord file
             return disnake.File(fp=output, filename='champion_card.png')
+
+    async def generate_leaderboard_card(self, guild_name: str, gamemode: str, limit: int, min_games: int, kda_data: list, winrate_data: list, dpm_data: list) -> disnake.File:
+        """Generate a leaderboard card as an image file."""
+
+        # 1. Get theme and background
+        # Use the raw gamemode key for theme/image lookup
+        theme = self.gamemode_themes.get(gamemode, self.gamemode_themes["CLASSIC"])
+        bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
+        try:
+            with open(bg_image_path, "rb") as image_file:
+                background_image = base64.b64encode(image_file.read()).decode()
+        except FileNotFoundError:
+            print(f"Warning: Could not find background image for gamemode {gamemode}")
+            background_image = None # Template can handle None
+
+        # 2. Find latest patch for profile icons
+        gamedata_path = os.path.join(self.assets_path, "gamedata")
+        patch_folders = [d for d in os.listdir(gamedata_path) if os.path.isdir(os.path.join(gamedata_path, d)) and d not in ['img']]
+        # Sort folders numerically/lexicographically if possible, assuming version format like X.Y.Z
+        try:
+            # Attempt to sort by version numbers
+             patch_folders.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+             latest_patch = patch_folders[0] if patch_folders else "15.1.1"
+        except ValueError:
+             # Fallback to simple sort if version format is unexpected
+             latest_patch = sorted(patch_folders, reverse=False)[0] if patch_folders else "15.1.1"
+             
+        print(f"Using latest patch folder for icons: {latest_patch}")
+        profile_icon_base_path = os.path.join(self.assets_path, "gamedata", latest_patch, "img", "profileicon")
+
+        # Helper function to load icon (modified to handle potential errors)
+        def _load_icon(icon_id):
+            if icon_id is None: # Handle cases where icon_id might be missing
+                icon_id = 0 # Default to 0
+                
+            profile_icon_path = os.path.join(profile_icon_base_path, f"{icon_id}.png")
+            default_icon_path = os.path.join(profile_icon_base_path, "0.png")
+            
+            try:
+                target_path = profile_icon_path if os.path.exists(profile_icon_path) else default_icon_path
+                if os.path.exists(target_path):
+                     with open(target_path, "rb") as img_file:
+                         return base64.b64encode(img_file.read()).decode('utf-8')
+                else:
+                     print(f"Warning: Profile icon {icon_id} and default icon 0 not found in {profile_icon_base_path}")
+                     return "" # Return empty string if neither found
+            except Exception as e:
+                print(f"Error loading profile icon {icon_id} (fallback 0): {e}")
+                return "" # Return empty string on error
+
+        # 3. Process leaderboard data (add icons and colors)
+        processed_kda = []
+        if kda_data:
+            # Data is a list of tuples: (name, kda, games, profile_icon_id)
+            for player_tuple in kda_data:
+                name, kda, total_games, profile_icon_id = player_tuple
+                player_dict = {
+                    'name': name,
+                    'kda': kda,
+                    'total_games': total_games,
+                    'profile_icon': _load_icon(profile_icon_id),
+                    'kda_color': self.get_kda_color(kda, theme)
+                }
+                processed_kda.append(player_dict)
+
+        processed_winrate = []
+        if winrate_data:
+            # Data is a list of tuples: (name, winrate, games, profile_icon_id)
+            for player_tuple in winrate_data:
+                name, raw_winrate, total_games, profile_icon_id = player_tuple
+                player_dict = {
+                    'name': name,
+                    'winrate': self.format_percentage(raw_winrate),
+                    'total_games': total_games,
+                    'profile_icon': _load_icon(profile_icon_id),
+                    'winrate_color': self.get_winrate_color(raw_winrate)
+                }
+                processed_winrate.append(player_dict)
+
+        processed_dpm = []
+        if dpm_data:
+            # Data is a list of tuples: (name, dpm, games, profile_icon_id)
+            for player_tuple in dpm_data:
+                name, dpm, total_games, profile_icon_id = player_tuple
+                player_dict = {
+                    'name': name,
+                    'dpm': dpm,
+                    'total_games': total_games,
+                    'profile_icon': _load_icon(profile_icon_id)
+                }
+                processed_dpm.append(player_dict)
+
+        # 4. Render template
+        template = self.jinja_env.get_template('leaderboard_card.html')
+        html_content = template.render(
+            guild_name=guild_name,
+            gamemode=translate(gamemode),
+            limit=limit,
+            min_games=min_games,
+            theme=theme,
+            background_image=background_image,
+            kda_data=processed_kda,
+            winrate_data=processed_winrate,
+            dpm_data=processed_dpm
+        )
+
+        # 5. Use playwright to render HTML to image
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            # Increase initial viewport height significantly
+            page = await browser.new_page(viewport={'width': 1200, 'height': 850}) 
+            await page.set_content(html_content)
+
+            # Wait for network idle and a short timeout for rendering stability
+            try:
+                await page.wait_for_load_state('networkidle', timeout=10000) 
+                await page.wait_for_timeout(500) # Extra buffer for rendering
+            except Exception as e:
+                 print(f"Playwright timeout or error during load state: {e}")
+                 await browser.close()
+                 raise RuntimeError(f"Playwright failed during page load: {e}")
+
+            # Find the main card element
+            element_handle = await page.query_selector('.card')
+            if not element_handle:
+                 print("DEBUG: .card element NOT found in template.") # DEBUG
+                 await browser.close()
+                 raise RuntimeError("Could not find .card element for screenshotting.")
+            else:
+                print("DEBUG: .card element found. Attempting element screenshot...") # DEBUG
+                # Screenshot the element directly
+                try:
+                    image_bytes = await element_handle.screenshot(type='png')
+                    print("DEBUG: Element screenshot successful.") # DEBUG
+                except Exception as e:
+                    print(f"DEBUG: Error taking element screenshot: {e}. Falling back to viewport screenshot.") # DEBUG
+                    # Fallback to viewport screenshot if element screenshot fails
+                    image_bytes = await page.screenshot(type='png')
+
+            await browser.close()
+
+        # 6. Save to BytesIO and return Disnake File
+        if not image_bytes:
+             raise RuntimeError("Failed to generate leaderboard image bytes.")
+             
+        output = io.BytesIO(image_bytes)
+        output.seek(0)
+        return disnake.File(fp=output, filename='leaderboard_card.png')
 
 def setup(bot):
     bot.add_cog(CardGenerator(bot)) 

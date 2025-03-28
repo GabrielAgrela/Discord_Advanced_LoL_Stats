@@ -1,7 +1,7 @@
 from disnake.ext import commands
 import disnake
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from ..models.models import User, PlayerStats, PlayerFriendStats
 from ..Utils import translate
 
@@ -352,13 +352,104 @@ class Commands(commands.Cog):
         inter: disnake.ApplicationCommandInteraction
     ):
         """
-        DEBUG: Populate the champions table with data from Data Dragon API
-
+        Populate the champions table with the latest data from Riot (requires admin permissions).
         """
-        # this will take a while like 5 minutes
-        await inter.response.send_message("Populating champions table, this will take a while...", ephemeral=True)
-        await self.bot.get_cog("RiotAPIOperations").populate_champions_table()
-        await inter.edit_original_message(content="Champions table populated", embed=None)
+        # Add permission check if needed
+        if not await self.bot.is_botlol_channel(inter):
+            return
+        if not inter.author.guild_permissions.administrator:
+             await inter.response.send_message("You need administrator permissions to run this command.", ephemeral=True)
+             return
+
+        await inter.response.defer()
+        try:
+            champions_added = await self.bot.get_cog('RiotAPIOperations').insert_champions_into_db()
+            if champions_added is not None:
+                 await inter.followup.send(f"Successfully added/updated {champions_added} champions in the database.")
+            else:
+                 await inter.followup.send("Failed to fetch or insert champion data. Check bot logs.")
+        except Exception as e:
+            print(f"Error populating champions table: {e}")
+            await inter.followup.send(f"An error occurred: {e}")
+
+    # --- Leaderboard Command (Combined) ---
+    @commands.slash_command(name="leaderboard")
+    async def leaderboard(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
+        limit: int = commands.Param(default=10, min_value=1, max_value=25, description="Number of players to display per board"),
+        min_games: int = commands.Param(default=10, min_value=1, description="Minimum games for Win Rate board")
+    ):
+        """Displays KDA, Win Rate, and Pentakills leaderboards for tracked players."""
+        if not await self.bot.is_botlol_channel(inter):
+            return
+        if not inter.guild:
+            await inter.response.send_message("This command can only be used in a server.", ephemeral=True)
+            return
+
+        gamemode_translated = translate(gamemode)
+        await inter.response.defer() # Defer initial response
+        
+        any_data_found = False
+        db_cog = self.bot.get_cog("DatabaseOperations")
+        formatter_cog = self.bot.get_cog("DataFormatter")
+
+        try:
+            # --- KDA Leaderboard --- 
+            kda_data = await db_cog.get_leaderboard_kda(
+                gamemode_translated, inter.guild.id, limit=limit
+            )
+            if kda_data:
+                any_data_found = True
+                kda_description = await formatter_cog.format_leaderboard_kda(kda_data)
+                kda_embed = disnake.Embed(
+                    title=f"🏆 {inter.guild.name} - {gamemode} KDA Leaderboard (Top {len(kda_data)}) 🏆",
+                    description=kda_description,
+                    color=disnake.Color.gold()
+                )
+                await inter.followup.send(embed=kda_embed) # Send as followup
+            
+            # --- Win Rate Leaderboard --- 
+            winrate_data = await db_cog.get_leaderboard_winrate(
+                gamemode_translated, inter.guild.id, min_games=min_games, limit=limit
+            )
+            if winrate_data:
+                any_data_found = True
+                winrate_description = await formatter_cog.format_leaderboard_winrate(winrate_data)
+                winrate_embed = disnake.Embed(
+                    title=f"📈 {inter.guild.name} - {gamemode} Win Rate Leaderboard (Top {len(winrate_data)}, Min {min_games} Games) 📈",
+                    description=winrate_description,
+                    color=disnake.Color.green()
+                )
+                await inter.followup.send(embed=winrate_embed) # Send as followup
+                
+            # --- Pentakills Leaderboard --- 
+            pentakills_data = await db_cog.get_leaderboard_pentakills(
+                gamemode_translated, inter.guild.id, limit=limit
+            )
+            if pentakills_data:
+                any_data_found = True
+                pentakills_description = await formatter_cog.format_leaderboard_pentakills(pentakills_data)
+                pentakills_embed = disnake.Embed(
+                    title=f"☠️ {inter.guild.name} - {gamemode} Pentakills Leaderboard (Top {len(pentakills_data)}) ☠️",
+                    description=pentakills_description,
+                    color=disnake.Color.red()
+                )
+                await inter.followup.send(embed=pentakills_embed) # Send as followup
+
+            # --- No Data Message --- 
+            if not any_data_found:
+                 no_data_embed = disnake.Embed(
+                    title=f"{gamemode} Leaderboards",
+                    description=f"No tracked players found with relevant stats in {gamemode} for this server.",
+                    color=disnake.Color.orange()
+                 )
+                 await inter.followup.send(embed=no_data_embed)
+
+        except Exception as e:
+            print(f"Error in leaderboard: {e}") # Updated error message context
+            await inter.followup.send(f"An error occurred while fetching the leaderboards.")
 
 def setup(bot):
     bot.add_cog(Commands(bot)) 

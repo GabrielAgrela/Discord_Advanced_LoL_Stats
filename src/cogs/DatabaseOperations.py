@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 from disnake.ext import commands
 import aiohttp
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 from ..models.models import Match, Participant, User, PlayerStats, PlayerFriendStats, UserStats
 
 DB_PATH = "/app/data/lol_stats.db"
@@ -882,6 +882,90 @@ class DatabaseOperations(commands.Cog):
             summoner_level=0,  # Not relevant for global stats
             profile_icon=0  # Not relevant for global stats
         )
+
+    async def get_leaderboard_kda(self, gamemode: str, guild_id: int, limit: int = 10) -> List[Tuple[str, float, int]]:
+        """Fetches the KDA leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        query = """
+        SELECT
+            p.riot_id_game_name,
+            ROUND(AVG(CASE
+                WHEN p.deaths = 0 THEN p.kills + p.assists
+                ELSE CAST(p.kills + p.assists AS FLOAT) / p.deaths
+            END), 2) as average_kda,
+            COUNT(DISTINCT p.match_id) as total_games
+        FROM participants p
+        JOIN matches m ON p.match_id = m.match_id
+        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
+        WHERE LOWER(m.game_mode) = LOWER(?)
+          AND u.guild_id = ?                 -- Filter by guild_id
+          AND p.riot_id_game_name IS NOT NULL 
+          AND p.riot_id_game_name != '0' 
+          AND p.riot_id_game_name != ''
+        GROUP BY p.riot_id_game_name
+        HAVING total_games > 0
+        ORDER BY average_kda DESC
+        LIMIT ?;
+        """
+        cursor.execute(query, (gamemode, guild_id, limit)) # Pass guild_id
+        results = cursor.fetchall()
+        conn.close()
+        return results # Returns list of (name, kda, games)
+
+    async def get_leaderboard_winrate(self, gamemode: str, guild_id: int, min_games: int = 10, limit: int = 10) -> List[Tuple[str, float, int]]:
+        """Fetches the Win Rate leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        query = """
+        SELECT
+            p.riot_id_game_name,
+            ROUND(AVG(CASE WHEN p.wins = 1 THEN 100.0 ELSE 0 END), 1) as winrate,
+            COUNT(DISTINCT p.match_id) as total_games
+        FROM participants p
+        JOIN matches m ON p.match_id = m.match_id
+        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
+        WHERE LOWER(m.game_mode) = LOWER(?)
+          AND u.guild_id = ?                 -- Filter by guild_id
+          AND p.riot_id_game_name IS NOT NULL 
+          AND p.riot_id_game_name != '0' 
+          AND p.riot_id_game_name != ''
+        GROUP BY p.riot_id_game_name
+        HAVING total_games >= ?
+        ORDER BY winrate DESC
+        LIMIT ?;
+        """
+        cursor.execute(query, (gamemode, guild_id, min_games, limit)) # Pass guild_id
+        results = cursor.fetchall()
+        conn.close()
+        return results # Returns list of (name, winrate, games)
+
+    async def get_leaderboard_pentakills(self, gamemode: str, guild_id: int, limit: int = 10) -> List[Tuple[str, int, int]]:
+        """Fetches the Pentakills leaderboard for a specific gamemode, filtered by tracked users in a guild."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        query = """
+        SELECT
+            p.riot_id_game_name,
+            SUM(p.penta_kills) as total_pentakills,
+            COUNT(DISTINCT p.match_id) as total_games
+        FROM participants p
+        JOIN matches m ON p.match_id = m.match_id
+        INNER JOIN users u ON p.puuid = u.puuid  -- Join with users table
+        WHERE LOWER(m.game_mode) = LOWER(?)
+          AND u.guild_id = ?                 -- Filter by guild_id
+          AND p.riot_id_game_name IS NOT NULL 
+          AND p.riot_id_game_name != '0' 
+          AND p.riot_id_game_name != ''
+        GROUP BY p.riot_id_game_name
+        HAVING total_pentakills > 0
+        ORDER BY total_pentakills DESC
+        LIMIT ?;
+        """
+        cursor.execute(query, (gamemode, guild_id, limit)) # Pass guild_id
+        results = cursor.fetchall()
+        conn.close()
+        return results # Returns list of (name, pentakills, games)
 
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

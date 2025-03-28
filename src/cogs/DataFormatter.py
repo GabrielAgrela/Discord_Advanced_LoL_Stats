@@ -1,6 +1,7 @@
 from datetime import datetime
+import disnake
 from disnake.ext import commands
-from typing import List
+from typing import List, Tuple
 from ..models.models import PlayerStats, PlayerFriendStats, User, UserStats
 
 class DataFormatter(commands.Cog):
@@ -219,6 +220,46 @@ class DataFormatter(commands.Cog):
             "title": "🎮 Updating Database",
             "description": f"Adding {match_count} matches to the database found for {game_name}"
         }
+
+    async def format_leaderboard_kda(self, data: List[Tuple[str, float, int]]) -> str:
+        """Formats KDA leaderboard data into a string for embeds."""
+        if not data:
+            return "No data to display."
+        
+        description = ""
+        rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
+        for i, (name, kda, games) in enumerate(data, start=1):
+            rank_icon = rank_icons.get(i, f"**{i}.**")
+            safe_name = disnake.utils.escape_markdown(name)
+            description += f"{rank_icon} `{safe_name}` - KDA: **{kda:.2f}** ({games} games)\n"
+        return description
+
+    async def format_leaderboard_winrate(self, data: List[Tuple[str, float, int]]) -> str:
+        """Formats Win Rate leaderboard data into a string for embeds."""
+        if not data:
+            return "No data to display."
+        
+        description = ""
+        rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
+        for i, (name, winrate, games) in enumerate(data, start=1):
+            rank_icon = rank_icons.get(i, f"**{i}.**")
+            safe_name = disnake.utils.escape_markdown(name)
+            description += f"{rank_icon} `{safe_name}` - Win Rate: **{winrate:.1f}%** ({games} games)\n"
+        return description
+
+    async def format_leaderboard_pentakills(self, data: List[Tuple[str, int, int]]) -> str:
+        """Formats Pentakills leaderboard data into a string for embeds."""
+        if not data:
+            return "No data to display."
+        
+        description = ""
+        rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
+        for i, (name, pentas, games) in enumerate(data, start=1):
+            rank_icon = rank_icons.get(i, f"**{i}.**")
+            safe_name = disnake.utils.escape_markdown(name)
+            pentas_text = "Pentakill" if pentas == 1 else "Pentakills"
+            description += f"{rank_icon} `{safe_name}` - **{pentas}** {pentas_text} ({games} games)\n"
+        return description
 
 def setup(bot):
     bot.add_cog(DataFormatter(bot))

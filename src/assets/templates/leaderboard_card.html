@@ -255,7 +255,7 @@
                     <tbody>
                         {% for player in kda_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
+                            <td class="col-rank">{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% else %}{{ loop.index }}{% endif %}</td>
                             <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">
@@ -287,7 +287,7 @@
                     <tbody>
                         {% for player in winrate_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
+                            <td class="col-rank">{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% else %}{{ loop.index }}{% endif %}</td>
                             <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">
@@ -319,7 +319,7 @@
                     <tbody>
                         {% for player in dpm_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
+                            <td class="col-rank">{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% else %}{{ loop.index }}{% endif %}</td>
                             <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">

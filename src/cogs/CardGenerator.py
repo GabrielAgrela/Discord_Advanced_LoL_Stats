@@ -1211,8 +1211,9 @@ class CardGenerator(commands.Cog):
 
         # 1. Get theme and background
         # Use the raw gamemode key for theme/image lookup
+        gamemode_png_name = translate(gamemode)
         theme = self.gamemode_themes.get(gamemode, self.gamemode_themes["CLASSIC"])
-        bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
+        bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode_png_name}.png")
         try:
             with open(bg_image_path, "rb") as image_file:
                 background_image = base64.b64encode(image_file.read()).decode()
@@ -1337,7 +1338,7 @@ class CardGenerator(commands.Cog):
                 print("DEBUG: .card element found. Attempting element screenshot...") # DEBUG
                 # Screenshot the element directly
                 try:
-                    image_bytes = await element_handle.screenshot(type='png')
+                    image_bytes = await page.screenshot(type='png')
                     print("DEBUG: Element screenshot successful.") # DEBUG
                 except Exception as e:
                     print(f"DEBUG: Error taking element screenshot: {e}. Falling back to viewport screenshot.") # DEBUG

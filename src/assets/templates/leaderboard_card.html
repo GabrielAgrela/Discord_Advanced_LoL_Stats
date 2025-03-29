@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ guild_name }} - {{ gamemode }} Leaderboards</title>
-    <!-- Removed Bootstrap link as it's not used in other cards and we'll use custom styles -->
+    <title>{{ guild_name }} - {{ gamemode }} Leadedboards</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         @font-face {
             font-family: 'BeaufortforLOL';
@@ -16,27 +16,28 @@
             src: url('/app/src/assets/fonts/Spiegel-Regular.ttf') format('truetype');
         }
         body {
-            background-color: transparent; /* Let playwright handle background */
+            background-color: transparent;
             font-family: 'Spiegel', sans-serif;
             margin: 0;
-            padding: 0; /* Reset padding */
-            /* Mimic fixed size for rendering consistency */
-            width: 1200px; /* Match viewport width */
-            height: 850px; /* Match viewport height - adjust if needed */
+            padding: 0;
+            width: 1200px;
+            height: 850px;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #e0e0e0;
-            overflow: hidden; /* Prevent scrollbars affecting screenshot */
+            overflow: hidden;
         }
+        
+        /* Background styling - FULL SIZE */
         .background-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #0a0a0a; /* Dark fallback */
+            background-color: #0a0a0a;
             overflow: hidden;
             z-index: 1;
         }
@@ -48,209 +49,189 @@
             height: 100%;
             background-size: cover;
             background-position: center;
-            opacity: 0.3; /* Adjusted opacity */
-            filter: blur(4px); /* Adjusted blur */
+            opacity: 1;
+            filter: blur(0px);
             z-index: 1;
-            /* Apply background only if it exists - MOVED TO INLINE STYLE */
-            /* {% if background_image %}
-            background-image: url('data:image/png;base64,{{ background_image }}');
-            {% endif %} */
         }
-        /* Main card container styling - mimicking .card from other templates */
+        
+        /* Card with EXPLICIT MARGINS */
         .card {
             position: relative;
             z-index: 10;
-            max-width: 1140px; /* Slightly wider */
-            width: 95%;
-            margin: 25px auto; /* Add some margin */
-            background: linear-gradient(135deg,
-                rgba(30, 35, 40, 0.9), /* Slightly less transparent */
-                rgba(15, 18, 21, 0.95));
-            border-radius: 25px;
+            width: 85%;
+            max-width: 1000px;
+            margin: 120px auto; /* LARGE TOP/BOTTOM MARGINS */
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6),
-                        0 5px 15px rgba(0, 0, 0, 0.4); /* Stronger shadow */
-            padding: 30px; /* Increased padding */
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            padding: 15px;
             overflow: hidden;
-            /* Define CSS variables using Jinja */
-            --theme-primary: {{ theme.primary | default('rgb(255,215,0)') }};
-            --theme-primary-alpha: {{ theme.primary | replace('rgb(', 'rgba(') | replace(')', ', 0.5)') | default('rgba(255,215,0,0.5)') }};
         }
+        
         /* Header styling */
         .header {
             text-align: center;
-            margin-bottom: 30px; /* More space */
-            padding-bottom: 20px; /* More space */
-            /* Use CSS variable for border */
-            border-bottom: 1px solid var(--theme-primary-alpha);
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .header h1 { /* Guild Name */
+        .header h1 {
             font-family: 'BeaufortforLOL', sans-serif;
             color: white;
-            margin: 0 0 5px 0; /* Space below */
-            font-size: 2.8em; /* Larger */
+            margin: 0 0 4px 0;
+            font-size: 2.2em;
             font-weight: 800;
-            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7); /* Stronger shadow */
+            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
             letter-spacing: 1px;
         }
-        .header p { /* Gamemode subtitle */
-            margin: 5px 0 0;
-            font-size: 1.2em; /* Slightly larger */
-            color: #c0c0c0; /* Brighter gray */
+        .header p {
+            margin: 4px 0 0;
+            font-size: 1em;
+            color: rgb(127, 255, 0);
             font-family: 'Spiegel', sans-serif;
             text-transform: uppercase;
             letter-spacing: 1.5px;
             font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
-        /* Grid for the leaderboards */
+        
+        /* Grid layout */
         .leaderboards-grid {
             display: grid;
-            /* Adjust column widths: Middle column slightly wider */
-            grid-template-columns: 1fr 1.15fr 1fr;
-            gap: 15px; /* Reduced gap */
+            grid-template-columns: 1fr 1.1fr 1fr;
+            gap: 10px;
         }
-        /* Individual leaderboard section styling */
+        
+        /* Leaderboard box styling */
         .leaderboard-box {
-            background: linear-gradient(135deg,
-                rgba(22, 25, 28, 0.98), /* Exact match */
-                rgba(15, 18, 21, 0.98));
-            border-radius: 20px; /* Match */
-            padding-right: 15px; /* Reduced padding */
-            padding-left: 15px; /* Reduced padding */
-            padding-top: 20px; /* Reduced padding */
-            padding-bottom: 20px; /* Reduced padding */
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), /* Match shadow */
-                        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.12); /* Match border */
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             display: flex;
             flex-direction: column;
-            transition: transform 0.2s ease, box-shadow 0.2s ease; 
         }
-        .leaderboard-box:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35),
-                        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
-        }
-        .leaderboard-box h2 { /* KDA, Win Rate, Pentakills titles */
+        
+        /* Header styling */
+        .leaderboard-box h2 {
             font-family: 'BeaufortforLOL', sans-serif;
-            /* Use CSS variable for color */
-            color: var(--theme-primary);
+            color: rgb(127, 255, 0);
             text-align: center;
             margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.8em;
+            margin-bottom: 8px;
+            font-size: 1.3em;
             font-weight: 700;
             text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
             border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-            padding-bottom: 15px;
+            padding-bottom: 6px;
         }
-        /* Table styling for leaderboard list */
+        
+        /* Table styling */
         .leaderboard-table {
             width: 100%;
-            border-collapse: separate; 
-            border-spacing: 0 4px; /* Slightly reduced spacing */
-            margin-top: 5px;
-            table-layout: fixed; /* Helps with column widths */
+            border-collapse: separate;
+            border-spacing: 0 2px;
+            margin-top: 4px;
+            table-layout: fixed;
         }
         .leaderboard-table tbody tr {
-            background-color: transparent; /* Match parent */
-            border-radius: 0; /* Remove row radius, let cells handle it? Check reference */
-            transition: background-color 0.2s ease;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04); /* Subtle row border like references */
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
         .leaderboard-table tbody tr:last-child {
-             border-bottom: none;
+            border-bottom: none;
         }
-        .leaderboard-table tbody tr:hover {
-             background-color: rgba(255, 255, 255, 0.03); /* Match hover */
-             transform: none; /* Remove scale effect if not in references */
-             border: none; /* Remove hover border if not in references */
-             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        }
+        
+        /* Table cell styling */
         .leaderboard-table td {
-            padding: 10px 8px;
+            padding: 4px 3px;
             vertical-align: middle;
-            font-size: 1em;
-            color: #e8e8e8; /* Match */
-            text-align: left; /* Default left align */
+            font-size: 0.8em;
+            color: #e8e8e8;
+            text-align: left;
         }
-        /* Define column widths and specific styles */
+        
+        /* Column-specific styling */
         .leaderboard-table td.col-rank {
             font-family: 'BeaufortforLOL', sans-serif;
             font-weight: bold;
-            /* Use CSS variable for color */
-            color: var(--theme-primary);
-            text-align: center; /* Center rank */
-            width: 10%; /* Width for rank */
-            font-size: 1.1em;
-            padding-right: 5px; /* Spacing */
+            color: rgb(127, 255, 0);
+            text-align: center;
+            width: 10%;
+            font-size: 0.95em;
+            padding-right: 2px;
         }
         .leaderboard-table td.col-icon {
-            width: 14%; /* Increased Width for icon */
-            text-align: center; /* Center icon */
+            width: 14%;
+            text-align: center;
             padding-left: 0;
             padding-right: 0;
         }
         .leaderboard-table td.col-name {
-            width: 41%; /* Decreased Width for name */
-            padding-left: 10px; /* Increased padding */
-            font-size: 0.8em; /* Make username text smaller */
-            /* Apply text overflow directly to the TD */
+            width: 41%;
+            padding-left: 5px;
+            font-size: 0.8em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .leaderboard-table td.col-stat {
-            width: 18%; /* Width for main stat (KDA, WR, Pentas) */
+            width: 18%;
             text-align: right;
+            font-weight: bold;
         }
         .leaderboard-table td.col-details {
-            width: 17%; /* Width for secondary details (Games played) */
+            width: 17%;
             text-align: right;
-            padding-left: 5px;
+            padding-left: 3px;
         }
-        /* Add specific style for winrate details span */
+        
+        /* Stat details styling */
         .winrate-details {
-            font-size: 0.85em; /* Make game count text smaller */
-            color: #b0b0b0; /* Existing color */
-            white-space: nowrap; /* Keep on one line */
-            font-style: italic; /* Keep italic */
+            font-size: 0.7em;
+            color: #b0b0b0;
+            white-space: nowrap;
+            font-style: italic;
         }
-        /* Remove width from .rank as it's handled by col-rank */
+        
+        /* Stat colors */
+        .kda-stat {
+            /* Default color, will be overridden by template */
+            color: rgb(127, 255, 0); 
+        }
+        .winrate-stat {
+            /* Default color, will be overridden by template */
+            color: rgb(127, 255, 0);
+        }
+        .dpm-stat {
+            color: rgb(127, 255, 0);
+        }
+        
+        /* Profile icon styling */
         .profile-icon {
-            width: 36px;
-            height: 36px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            /* margin: 0 8px; */ /* REMOVED margin - handled by cell padding/width */
-            border: 2px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             vertical-align: middle;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             display: inline-block;
         }
-        .player-name {
-            display: inline-block; /* Changed from inline-block to block */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%; /* Allow name to fill cell width before truncating */
-            /* max-width: 160px; */ /* REMOVED fixed max-width */
-            color: #e0e0e0;
-            font-weight: 500;
-            font-size: 1.05em;
-            vertical-align: middle; /* Align with icon */
-            padding-left: 8px; /* Space between icon and name */
-        }
+        
+        /* Empty state styling */
         .no-data {
             text-align: center;
             color: #aaa;
             font-style: italic;
-            margin-top: 20px;
-            padding: 15px;
-            font-size: 1.1em;
-            background-color: rgba(0,0,0,0.1);
-            border-radius: 10px;
+            margin-top: 10px;
+            padding: 6px;
+            font-size: 0.85em;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 6px;
         }
     </style>
 </head>
@@ -258,22 +239,23 @@
     <div class="background-container">
         <div class="background-image" {% if background_image %}style="background-image: url('data:image/png;base64,{{ background_image }}');"{% endif %}></div>
     </div>
+    
     <div class="card">
         <div class="header">
-            <h1>{{ guild_name }}</h1>
-            <p>{{ gamemode }} Leaderboards (Top {{ limit }})</p>
+            <h1>{{ guild_name }} <i class="fas fa-gamepad"></i></h1>
+            <p>{{ gamemode }} Leaderboards (Top {{ limit }}) <i class="fas fa-star"></i></p>
         </div>
 
         <div class="leaderboards-grid">
             <!-- KDA Leaderboard -->
             <div class="leaderboard-box">
-                <h2><i class="fas fa-crosshairs"></i> Top KDA</h2>
+                <h2>Top KDA <i class="fas fa-trophy"></i></h2>
                 {% if kda_data %}
                 <table class="leaderboard-table">
                     <tbody>
                         {% for player in kda_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}</td>
+                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
                             <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">
@@ -282,8 +264,8 @@
                             <td class="col-name">
                                 {{ player.name }}
                             </td>
-                            <td class="col-stat" style="color: rgb({{ player.kda_color[0] }}, {{ player.kda_color[1] }}, {{ player.kda_color[2] }});">
-                                <span class="stat">{{ '%.2f'|format(player.kda) }}</span>
+                            <td class="col-stat">
+                                <span class="stat kda-stat">{{ '%.2f'|format(player.kda) }}</span>
                             </td>
                             <td class="col-details">
                                 <span class="winrate-details">({{ player.total_games }} gs)</span>
@@ -299,13 +281,13 @@
 
             <!-- Win Rate Leaderboard -->
             <div class="leaderboard-box">
-                <h2><i class="fas fa-chart-line"></i> Top Win Rate</h2>
+                <h2>Top Win Rate <i class="fas fa-fire"></i></h2>
                 {% if winrate_data %}
                 <table class="leaderboard-table">
                     <tbody>
                         {% for player in winrate_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}</td>
+                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
                             <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">
@@ -314,8 +296,8 @@
                             <td class="col-name">
                                 {{ player.name }}
                             </td>
-                            <td class="col-stat" style="color: rgb({{ player.winrate_color[0] }}, {{ player.winrate_color[1] }}, {{ player.winrate_color[2] }});">
-                                <span class="stat">{{ player.winrate }}%</span>
+                            <td class="col-stat">
+                                <span class="stat winrate-stat">{{ player.winrate }}%</span>
                             </td>
                             <td class="col-details">
                                 <span class="winrate-details">({{ player.total_games }} gs)</span>
@@ -324,21 +306,21 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                 {% else %}
+                {% else %}
                 <p class="no-data">Not enough data available (Min {{ min_games }} games required).</p>
                 {% endif %}
             </div>
 
             <!-- DPM Leaderboard -->
             <div class="leaderboard-box">
-                <h2><i class="fas fa-fist-raised"></i> Top DPM</h2>
-                 {% if dpm_data %}
+                <h2>Top DPM <i class="fas fa-bolt"></i></h2>
+                {% if dpm_data %}
                 <table class="leaderboard-table">
                     <tbody>
                         {% for player in dpm_data %}
                         <tr>
-                            <td class="col-rank">{{ loop.index }}</td>
-                             <td class="col-icon">
+                            <td class="col-rank">{{ loop.index }}{% if loop.index == 1 %}<i class="fas fa-medal" style="color:gold;"></i>{% elif loop.index == 2 %}<i class="fas fa-medal" style="color:silver;"></i>{% elif loop.index == 3 %}<i class="fas fa-medal" style="color:#cd7f32;"></i>{% endif %}</td>
+                            <td class="col-icon">
                                 {% if player.profile_icon %}
                                 <img src="data:image/png;base64,{{ player.profile_icon }}" alt="icon" class="profile-icon">
                                 {% endif %}
@@ -347,7 +329,7 @@
                                 {{ player.name }}
                             </td>
                             <td class="col-stat">
-                                <span class="stat">{{ player.dpm }}</span>
+                                <span class="stat dpm-stat">{{ player.dpm }}</span>
                             </td>
                             <td class="col-details">
                                 <span class="winrate-details">({{ player.total_games }} gs)</span>
@@ -356,8 +338,8 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                 {% else %}
-                 <p class="no-data">Not enough DPM data available.</p>
+                {% else %}
+                <p class="no-data">Not enough DPM data available.</p>
                 {% endif %}
             </div>
         </div>

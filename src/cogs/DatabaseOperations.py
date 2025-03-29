@@ -1,12 +1,12 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from datetime import time as dt_time
 import os
 from disnake.ext import commands
 import aiohttp
 from typing import List, Optional, Set, Tuple
 from ..models.models import Match, Participant, User, PlayerStats, PlayerFriendStats, UserStats
 import time
-import datetime
 
 DB_PATH = "/app/data/lol_stats.db"
 
@@ -897,15 +897,15 @@ class DatabaseOperations(commands.Cog):
         ]
 
         if period != "All Time":
-            today = datetime.date.today()
+            today = date.today()
             if period == "Weekly":
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
             elif period == "Monthly":
                 start_date = today.replace(day=1)
             else: # Default to weekly if invalid period somehow passed
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
             
-            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_datetime = datetime.combine(start_date, dt_time.min)
             start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
             where_clauses.append("m.game_end >= ?")
             params.append(start_string)
@@ -952,15 +952,15 @@ class DatabaseOperations(commands.Cog):
         ]
 
         if period != "All Time":
-            today = datetime.date.today()
+            today = date.today()
             if period == "Weekly":
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
             elif period == "Monthly":
                 start_date = today.replace(day=1)
             else: 
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
             
-            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_datetime = datetime.combine(start_date, dt_time.min)
             start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
             where_clauses.append("m.game_end >= ?")
             params.append(start_string)
@@ -1006,15 +1006,15 @@ class DatabaseOperations(commands.Cog):
         ]
 
         if period != "All Time":
-            today = datetime.date.today()
+            today = date.today()
             if period == "Weekly":
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
             elif period == "Monthly":
                 start_date = today.replace(day=1)
             else: # Default to weekly
-                start_date = today - datetime.timedelta(days=today.weekday())
+                start_date = today - timedelta(days=today.weekday())
 
-            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+            start_datetime = datetime.combine(start_date, dt_time.min)
             start_string = start_datetime.strftime('%Y-%m-%d %H:%M:%S')
             where_clauses.append("m.game_end >= ?")
             params.append(start_string)

@@ -373,14 +373,14 @@ class Commands(commands.Cog):
             await inter.followup.send(f"An error occurred: {e}")
 
     # --- Leaderboard Command (Combined) ---
-    @commands.slash_command(name="leaderboard")
-    async def leaderboard(
+    @commands.slash_command(name="generate_leaderboard")
+    async def generate_leaderboard(
         self,
         inter: disnake.ApplicationCommandInteraction,
         gamemode: str = commands.Param(choices=["ARAM", "Summoner's Rift", "Arena", "Nexus Blitz", "Swarm", "Ultimate Book", "URF"]),
-        period: str = commands.Param(default="Weekly", choices=["Weekly", "Monthly", "All Time"], description="Time period for stats"),
+        period: str = commands.Param(default="All Time", choices=["Weekly", "Monthly", "All Time"], description="Time period for stats"),
         limit: int = commands.Param(default=10, min_value=1, max_value=25, description="Number of players to display per board"),
-        min_games: int = commands.Param(default=10, min_value=1, description="Minimum games for Win Rate board")
+        min_games: int = commands.Param(default=1, min_value=1, description="Minimum games for Win Rate board")
     ):
         """Displays KDA, Win Rate, and Pentakills leaderboards for tracked players as a card."""
         if not await self.bot.is_botlol_channel(inter):

@@ -64,6 +64,8 @@ class Loops(commands.Cog):
                     try:
                         game_data = await self.bot.get_cog("RiotAPIOperations").get_current_game(user.puuid)
                         if game_data and game_data['gameId']:  # Only process if game_data is not None
+                            #debug print the game data
+                            print(game_data)
                             game_id = str(game_data['gameId'])
                             current_game_ids.add(game_id)
                             
@@ -139,64 +141,88 @@ class Loops(commands.Cog):
                                 match_region = self.bot.get_cog("RiotAPIOperations").ACCOUNT_REGION.upper()
                                 full_game_id = f"{match_region}_{game_id}" if not game_id.startswith(f"{match_region}_") else game_id
                                 
-                                player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
-                                
-                                #first send an embed with the game type, players and the date
                                 # Get match information from the database
                                 match_info = await self.bot.get_cog("DatabaseOperations").get_match_info(full_game_id)
                                 match_participants = await self.bot.get_cog("DatabaseOperations").get_match_participants(full_game_id)
                                 
                                 if match_info and match_participants:
-                                    game_mode = match_info[0]
+                                    game_mode = match_info[0] # Assuming index 0 is game mode/type
                                     game_start_date = match_info[3]
-                                    
-                                    # Get tracked users from the database
-                                    tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
-                                    tracked_puuids = {user.puuid for user in tracked_users}
-                                    
-                                    # Filter participants to only include tracked users
-                                    tracked_participants = []
-                                    for player in match_participants:
-                                        if player['puuid'] in tracked_puuids:
-                                            tracked_participants.append(f"{player['riot_id_game_name']} ({player['champion_name']})")
-                                    
-                                    # Create the embed
-                                    embed = disnake.Embed(
-                                        title=f"Match Summary: {game_mode}",
-                                        description="",
-                                        color=disnake.Color.blue()
-                                    )
-                                    
-                                    # Add timestamp
-                                    embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
-                                    
-                                    # Add tracked players field
-                                    if tracked_participants:
-                                        embed.add_field(
-                                            name="Players",
-                                            value="\n".join(tracked_participants),
-                                            inline=False
-                                        )
+
+                                    # Check if the game is a custom game
+                                    if game_mode == "CUSTOM": # Using "CUSTOM" as the identifier for custom games
+                                        await message.edit(embed=disnake.Embed(
+                                            title="🎮 Custom Game Over",
+                                            description="Stats generation skipped for custom games.",
+                                            color=disnake.Color.orange()
+                                        ))
+                                        # Skip generating cards and summary for custom games
                                     else:
-                                        embed.add_field(
-                                            name="Players",
-                                            value="No tracked players found in this match",
-                                            inline=False
+                                        # Proceed with generating cards and summary for non-custom games
+                                        player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
+
+                                        # Get tracked users from the database
+                                        tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
+                                        tracked_puuids = {user.puuid for user in tracked_users}
+                                        
+                                        # Filter participants to only include tracked users
+                                        tracked_participants = []
+                                        for player in match_participants:
+                                            if player['puuid'] in tracked_puuids:
+                                                tracked_participants.append(f"{player['riot_id_game_name']} ({player['champion_name']})")
+                                        
+                                        # Create the embed
+                                        embed = disnake.Embed(
+                                            title=f"Match Summary: {game_mode}",
+                                            description="",
+                                            color=disnake.Color.blue()
                                         )
+                                        
+                                        # Add timestamp
+                                        embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
+                                        
+                                        # Add tracked players field
+                                        if tracked_participants:
+                                            embed.add_field(
+                                                name="Players",
+                                                value="\\n".join(tracked_participants),
+                                                inline=False
+                                            )
+                                        else:
+                                            embed.add_field(
+                                                name="Players",
+                                                value="No tracked players found in this match",
+                                                inline=False
+                                            )
+                                        
+                                        # Send the match summary embed
+                                        await channel.send(embed=embed)
                                     
-                                    # Send the match summary embed
-                                    await channel.send(embed=embed)
-                                
-                                # Send a message for each player card
-                                for card in player_cards:
-                                    await channel.send(file=card)
+                                        # Send a message for each player card
+                                        for card in player_cards:
+                                            await channel.send(file=card)
+                                else:
+                                    # Handle cases where match data couldn't be fetched
+                                    error_embed = disnake.Embed(
+                                        title="❌ Error Fetching Match Data",
+                                        description=f"Could not retrieve details for game {full_game_id}.",
+                                        color=disnake.Color.red()
+                                    )
+                                    await message.edit(embed=error_embed)
+                                    await channel.send(embed=error_embed) # Also inform the channel
+
                             except Exception as e:
                                 print(f"Error generating finished game card for game {game_id}: {e}")
-                                await channel.send(embed=disnake.Embed(
+                                error_embed = disnake.Embed(
                                     title="❌ Error Generating Game Stats",
                                     description=f"Could not generate game stats: {str(e)}",
                                     color=disnake.Color.red()
-                                ))
+                                )
+                                try: # Attempt to edit the original message first
+                                    await message.edit(embed=error_embed)
+                                except disnake.NotFound: # If message is already deleted, just send to channel
+                                    pass 
+                                await channel.send(embed=error_embed)
                             
                             # Delete the original message after a delay
                             await asyncio.sleep(5)

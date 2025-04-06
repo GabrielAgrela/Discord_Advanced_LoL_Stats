@@ -299,7 +299,8 @@ class CardGenerator(commands.Cog):
             template = env.get_template('live_players_card.html')
 
             # Get the first player's gamemode for theming
-            theme = self.gamemode_themes.get(players[0]['gameMode'], self.gamemode_themes['CLASSIC'])
+            gamemode = players[0]['gameMode']
+            theme = self.gamemode_themes.get(gamemode, self.gamemode_themes['CLASSIC'])
 
             # Find latest patch folder for profile icons
             gamedata_path = os.path.join(self.assets_path, "gamedata")
@@ -342,7 +343,13 @@ class CardGenerator(commands.Cog):
                     player['games'] = stats.champion_games
                     player['winrate'] = f"{self.format_percentage(stats.winrate)}"
                     player['kda'] = f"{stats.average_kda:.2f}"
-                    player['pentas'] = stats.total_pentas
+                    # For Cherry/Arena modes, show first place count instead of pentas
+                    if gamemode in ['CHERRY', 'ARENA']:
+                        player['pentas'] = getattr(stats, 'first_place_count', 0)
+                        player['pentas_label'] = '1st Place'
+                    else:
+                        player['pentas'] = stats.total_pentas
+                        player['pentas_label'] = 'Pentas'
                     player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
                     player['avg_time_dead_pct'] = f"{self.format_percentage(stats.avg_time_dead_pct)}"
                     player['summoner_level'] = stats.summoner_level
@@ -355,6 +362,7 @@ class CardGenerator(commands.Cog):
                     player['winrate'] = "N/A"
                     player['kda'] = "N/A"
                     player['pentas'] = 0
+                    player['pentas_label'] = 'Pentas'  # Default label
                     player['damage_per_min'] = "N/A"
                     player['avg_time_dead_pct'] = "N/A"
                     player['summoner_level'] = player.get('summonerLevel', 0)
@@ -362,7 +370,7 @@ class CardGenerator(commands.Cog):
                     player['kda_color'] = (128, 128, 128)  # Gray for N/A
 
             # Read and encode background image
-            bg_image_path = os.path.join(self.assets_path, "images", f"{players[0]['gameMode']}.png")
+            bg_image_path = os.path.join(self.assets_path, "images", f"{gamemode}.png")
             try:
                 with open(bg_image_path, "rb") as image_file:
                     background_image = base64.b64encode(image_file.read()).decode()
@@ -372,7 +380,7 @@ class CardGenerator(commands.Cog):
             # Render template
             html_content = template.render(
                 players=players,
-                gamemode=translate(players[0]['gameMode']),
+                gamemode=translate(gamemode),
                 theme=theme,
                 background_image=background_image
             )

@@ -63,6 +63,7 @@ CREATE TABLE participants (
         lane TEXT,
         role TEXT,
         wins BOOLEAN,
+        first_place BOOLEAN,  -- Added for Cherry/Arena mode
         
         -- Combat stats
         kills INTEGER,

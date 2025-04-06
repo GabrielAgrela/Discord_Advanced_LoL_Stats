@@ -185,7 +185,7 @@ class Loops(commands.Cog):
                                         if tracked_participants:
                                             embed.add_field(
                                                 name="Players",
-                                                value="\\n".join(tracked_participants),
+                                                value="\n".join(tracked_participants),
                                                 inline=False
                                             )
                                         else:

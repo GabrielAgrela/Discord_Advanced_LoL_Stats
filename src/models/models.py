@@ -26,6 +26,7 @@ class Participant:
     lane: str
     role: str
     wins: bool
+    first_place: bool  # Added for Cherry/Arena mode
     # Combat stats
     kills: int
     deaths: int

@@ -1,12 +1,26 @@
 from datetime import datetime
 import disnake
 from disnake.ext import commands
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from ..models.models import PlayerStats, PlayerFriendStats, User, UserStats
+
+# Define the steps for the LoL update process
+UPDATE_STEPS = [
+    "Fetching latest LoL version",
+    "Cleaning old game data directory",
+    "Downloading game data archive (.tgz)",
+    "Extracting game data archive",
+    "Cleaning up downloaded archive",
+    "Fetching latest champion data (JSON)",
+    "Processing champion data",
+    "Inserting champion data into database",
+    "Update Complete"
+]
 
 class DataFormatter(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.UPDATE_STEPS = UPDATE_STEPS # Store steps if needed instance-wise, or keep module-level
 
     async def format_get_player_stats(self, data: List[PlayerStats]) -> str:
         if not data:
@@ -260,6 +274,31 @@ class DataFormatter(commands.Cog):
             pentas_text = "Pentakill" if pentas == 1 else "Pentakills"
             description += f"{rank_icon} `{safe_name}` - **{pentas}** {pentas_text} ({games} games)\n"
         return description
+
+    async def format_apply_update_steps(self, current_index: int, error: Optional[str] = None) -> str:
+        """Formats the list of steps for the apply_lol_update command, marking the current one."""
+        lines = []
+        steps = self.UPDATE_STEPS 
+        final_step_index = len(steps) - 1
+        
+        for i, step in enumerate(steps):
+            # Determine the prefix based on the current step index and whether it's the final step
+            if error and i == current_index:
+                prefix = "❌ " # Error occurred at this step
+            elif not error and i == final_step_index and current_index == final_step_index:
+                 prefix = "✅ " # Final step completed successfully
+            elif i == current_index:
+                prefix = "--> " # Current step in progress
+            elif i < current_index:
+                prefix = "✅ " # Step completed successfully
+            else:
+                prefix = "•   " # Pending step
+            lines.append(f"{prefix}{step}")
+        
+        formatted_steps = "\n".join(lines)
+        if error:
+            formatted_steps += f"\n\n**Error:** {error}"
+        return formatted_steps
 
 def setup(bot):
     bot.add_cog(DataFormatter(bot))

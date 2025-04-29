@@ -347,7 +347,7 @@ class Commands(commands.Cog):
         await inter.followup.send(file=card_file)
 
     @commands.slash_command()
-    async def populate_champions_table(
+    async def apply_lol_update(
         self,
         inter: disnake.ApplicationCommandInteraction
     ):
@@ -363,14 +363,23 @@ class Commands(commands.Cog):
 
         await inter.response.defer()
         try:
-            champions_added = await self.bot.get_cog('RiotAPIOperations').insert_champions_into_db()
-            if champions_added is not None:
-                 await inter.followup.send(f"Successfully added/updated {champions_added} champions in the database.")
-            else:
-                 await inter.followup.send("Failed to fetch or insert champion data. Check bot logs.")
+            champions_added = await self.bot.get_cog('RiotAPIOperations').apply_lol_update(inter=inter)
+            # The status is now handled by editing the original message within RiotAPIOperations
+            # if champions_added is not None:
+            #      await inter.followup.send(f"Successfully added/updated {champions_added} champions in the database.")
+            # else:
+            #      await inter.followup.send("Failed to fetch or insert champion data. Check bot logs.")
         except Exception as e:
             print(f"Error populating champions table: {e}")
-            await inter.followup.send(f"An error occurred: {e}")
+            # Try to update the original message with the error, otherwise send a followup
+            error_embed = disnake.Embed(title="LoL Data Update Error", description=f"An unexpected error occurred: {str(e)}", color=disnake.Color.red())
+            try:
+                await inter.edit_original_message(embed=error_embed)
+            except:
+                try:
+                    await inter.followup.send(embed=error_embed)
+                except Exception as followup_e:
+                     print(f"Failed to send error followup for apply_lol_update: {followup_e}")
 
     # --- Leaderboard Command (Combined) ---
     @commands.slash_command(name="generate_leaderboard")

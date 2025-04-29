@@ -7,7 +7,7 @@ import disnake
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from ..models.models import User, Match, Participant
 
 class RiotAPIOperations(commands.Cog):
@@ -281,73 +281,212 @@ class RiotAPIOperations(commands.Cog):
         
         return total_matches_updated
     
-    async def download_game_data(self, version: str) -> None:
-        """
-        Downloads and extracts game data for a specific version.
-        Args:
-            version: The game version (e.g., '15.1.1')
-        """
+    async def _clean_gamedata_directory(self) -> Tuple[bool, Optional[str]]:
+        """Cleans the gamedata directory. Returns (success, error_msg)."""
         import shutil
-        import tarfile
-        import aiofiles
-        import os
-
-        # Create gamedata directory if it doesn't exist
         gamedata_path = Path(__file__).parent.parent / 'assets' / 'gamedata'
-        gamedata_path.mkdir(parents=True, exist_ok=True)
+        gamedata_path.mkdir(parents=True, exist_ok=True) # Ensure base path exists
 
-        # Clean existing contents
         if gamedata_path.exists():
-            shutil.rmtree(gamedata_path)
-            gamedata_path.mkdir(parents=True)
+            try:
+                if any(gamedata_path.iterdir()): 
+                    shutil.rmtree(gamedata_path)
+                gamedata_path.mkdir(parents=True, exist_ok=True) # Recreate after removal
+            except Exception as e:
+                error_msg = f"Error cleaning old game data directory: {str(e)}"
+                print(error_msg)
+                return False, error_msg
+        return True, None
 
-        # Download the file
+    async def _download_gamedata_archive(self, version: str) -> Tuple[bool, Optional[str]]:
+        """Downloads the game data archive. Returns (success, error_msg)."""
+        import aiofiles
+        import aiohttp
+        gamedata_path = Path(__file__).parent.parent / 'assets' / 'gamedata'
         url = f"https://ddragon.leagueoflegends.com/cdn/dragontail-{version}.tgz"
         tgz_path = gamedata_path / f"dragontail-{version}.tgz"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    async with aiofiles.open(tgz_path, 'wb') as f:
-                        await f.write(await response.read())
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        async with aiofiles.open(tgz_path, 'wb') as f:
+                            await f.write(await response.read())
+                    else:
+                        error_msg = f"Failed to download game data archive. Status: {response.status}"
+                        print(error_msg)
+                        return False, error_msg
+        except aiohttp.ClientConnectorError as e:
+            error_msg = f"Network error during download: {str(e)}"
+            print(f"Network error downloading archive: {e}")
+            return False, error_msg
+        except Exception as e:
+             error_msg = f"Error during download: {str(e)}"
+             print(f"Error downloading archive: {e}")
+             return False, error_msg
+        return True, None
 
-                    # Extract the contents
-                    with tarfile.open(tgz_path, 'r:gz') as tar:
-                        tar.extractall(path=gamedata_path)
-
-                    # Delete the tgz file
-                    tgz_path.unlink()
-                else:
-                    print(f"Failed to download game data. Status: {response.status}")
+    async def _extract_gamedata_archive(self, version: str) -> Tuple[bool, Optional[str]]:
+        """Extracts the game data archive. Returns (success, error_msg)."""
+        import tarfile
+        gamedata_path = Path(__file__).parent.parent / 'assets' / 'gamedata'
+        tgz_path = gamedata_path / f"dragontail-{version}.tgz"
+        try:
+            with tarfile.open(tgz_path, 'r:gz') as tar:
+                tar.extractall(path=gamedata_path)
+        except Exception as e:
+             error_msg = f"Error extracting game data archive: {str(e)}"
+             print(error_msg)
+             return False, error_msg
+        return True, None
+        
+    async def _cleanup_gamedata_archive(self, version: str) -> Tuple[bool, Optional[str]]:
+        """Deletes the downloaded tgz file. Returns (success, error_msg)."""
+        gamedata_path = Path(__file__).parent.parent / 'assets' / 'gamedata'
+        tgz_path = gamedata_path / f"dragontail-{version}.tgz"
+        try:
+            if tgz_path.exists():
+                 tgz_path.unlink()
+        except Exception as e:
+             # Non-critical, log warning but proceed
+             error_msg = f"Warning: Could not delete downloaded archive file: {e}"
+             print(error_msg)
+             return False, error_msg # Treat warning as non-fatal for now
+        return True, None
 
     async def get_versions(self) -> List[str]:
         url = "https://ddragon.leagueoflegends.com/api/versions.json"
         data = await self.make_request(url)
-        return data if data else []  # Return empty list if data is None
+        return data if data else []
 
-    async def populate_champions_table(self) -> int:
+    async def apply_lol_update(self, inter: disnake.ApplicationCommandInteraction) -> int:
         """
-        Fetches champion data from Data Dragon API and populates the champions table.
-        Returns the number of champions added/updated.
+        Fetches latest LoL data, updating a status message with progress steps.
         """
-        versions = await self.get_versions()
-        if not versions:
-            print("Error fetching version data")
-            return 0
-        
-        await self.download_game_data(versions[0])
+        step_index = 0
+        data_formatter = self.bot.get_cog("DataFormatter") # Get formatter cog
+        status_embed = disnake.Embed(
+            title="LoL Data Update",
+            # Call DataFormatter for the initial description
+            description=await data_formatter.format_apply_update_steps(step_index),
+            color=disnake.Color.blue()
+        )
 
-        url = f"https://ddragon.leagueoflegends.com/cdn/{versions[0]}/data/en_US/champion.json"
-        champions_data = []
-
+        # --- Send Initial Message ---
         try:
-            data = await self.make_request(url)
-            if not data:
-                print("Error fetching champion data")
+            await inter.edit_original_message(embed=status_embed)
+        except disnake.NotFound:
+            await inter.followup.send(embed=status_embed)
+        except Exception as e:
+            print(f"Error sending initial status for apply_lol_update: {e}")
+            return 0
+
+        # --- Step 0: Get Versions ---
+        latest_version = None
+        try:
+            versions = await self.get_versions()
+            latest_version = versions[0] if versions else None
+            if not latest_version:
+                error_msg = "Could not fetch latest LoL version list."
+                # Call DataFormatter to format description with error
+                status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+                status_embed.color = disnake.Color.red()
+                await inter.edit_original_message(embed=status_embed)
                 return 0
-                
-            # Process each champion's data
-            for champ_key, champ_data in data['data'].items():
+            status_embed.title = f"LoL Data Update ({latest_version})"
+        except Exception as e:
+            error_msg = f"Unexpected error fetching versions: {str(e)}"
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+
+        # --- Step 1: Cleaning --- 
+        step_index = 1
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        success, error_msg = await self._clean_gamedata_directory()
+        if not success:
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+            
+        # --- Step 2: Downloading --- 
+        step_index = 2
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        success, error_msg = await self._download_gamedata_archive(latest_version)
+        if not success:
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+
+        # --- Step 3: Extracting --- 
+        step_index = 3
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        success, error_msg = await self._extract_gamedata_archive(latest_version)
+        if not success:
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+            
+        # --- Step 4: Cleanup Archive --- 
+        step_index = 4
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        success, error_msg = await self._cleanup_gamedata_archive(latest_version)
+        if not success:
+            print(error_msg)
+            # Call DataFormatter to format description with warning
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg + " (Continuing anyway)")
+            await inter.edit_original_message(embed=status_embed)
+            # Don't return 0 here
+
+        # --- Step 5: Fetch Champion JSON --- 
+        step_index = 5
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        
+        url = f"https://ddragon.leagueoflegends.com/cdn/{latest_version}/data/en_US/champion.json"
+        champions_data_dict = None
+        try:
+            champions_data_dict = await self.make_request(url)
+            if not champions_data_dict:
+                error_msg = "Error fetching champion JSON data (no data received)."
+                # Call DataFormatter to format description with error
+                status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+                status_embed.color = disnake.Color.red()
+                await inter.edit_original_message(embed=status_embed)
+                return 0
+        except Exception as e:
+            error_msg = f"Error during champion JSON request: {str(e)}"
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+            
+        # --- Step 6: Process Champions --- 
+        step_index = 6
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        champions_to_insert = []
+        try:
+            for champ_key, champ_data in champions_data_dict['data'].items():
                 stats = champ_data['stats']
                 champion = {
                     'id': int(champ_data['key']),
@@ -379,15 +518,54 @@ class RiotAPIOperations(commands.Cog):
                     'stats_attackspeedperlevel': stats['attackspeedperlevel'],
                     'stats_attackspeed': stats['attackspeed']
                 }
-                champions_data.append(champion)
-
-            # Insert the processed data into the database
-            return await self.bot.get_cog("DatabaseOperations").insert_champions(champions_data)
-
-        except Exception as e:
-            print(f"Error in populate_champions_table: {e}")
-            await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in populate_champions_table: {e}")
+                champions_to_insert.append(champion)
+        except KeyError as e:
+            error_msg = f"Data structure error processing champion data (KeyError: {e}). Check Data Dragon format."
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
             return 0
+        except Exception as e:
+            error_msg = f"Unexpected error processing champion data: {str(e)}"
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+            
+        # --- Step 7: Insert Champions --- 
+        step_index = 7
+        # Call DataFormatter to format description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index)
+        await inter.edit_original_message(embed=status_embed)
+        champions_added = 0
+        try:
+            champions_added = await self.bot.get_cog("DatabaseOperations").insert_champions(champions_to_insert)
+            if champions_added is None: # Assume None means DB error
+                 error_msg = "Database operation failed during champion insertion."
+                 # Call DataFormatter to format description with error
+                 status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+                 status_embed.color = disnake.Color.red()
+                 await inter.edit_original_message(embed=status_embed)
+                 return 0
+        except Exception as e:
+            error_msg = f"Error inserting champions into database: {str(e)}"
+            # Call DataFormatter to format description with error
+            status_embed.description = await data_formatter.format_apply_update_steps(step_index, error=error_msg)
+            status_embed.color = disnake.Color.red()
+            await inter.edit_original_message(embed=status_embed)
+            return 0
+
+        # --- Step 8: Complete --- 
+        step_index = 8
+        final_message = f"\n\nSuccessfully added/updated **{champions_added}** champions."
+        # Call DataFormatter to format final description
+        status_embed.description = await data_formatter.format_apply_update_steps(step_index) + final_message
+        status_embed.color = disnake.Color.green()
+        await inter.edit_original_message(embed=status_embed)
+        
+        return champions_added
 
 def setup(bot):
     bot.add_cog(RiotAPIOperations(bot))

@@ -17,7 +17,7 @@ A Discord bot that provides advanced League of Legends statistics and analytics 
 - Performance tracking and trends by champion
 - Player comparisons and friend stats
 - Automated stat updates and database maintenance
-- Support for multiple game modes (ARAM, Summoner\'s Rift, Arena, etc.)
+- Support for multiple game modes (ARAM, Summoner\'s Rift, Arena, Nexus Blitz, Swarm, Ultimate Book, URF)
 - Autocomplete support for player names and champions
 - Commands primarily operate within a dedicated `#botlol` channel (created automatically)
 
@@ -116,9 +116,10 @@ _Note: Most commands must be used within the `#botlol` channel._
 - `/player_friends_stats [username]` - View stats when playing with friends (uses autocomplete for username).
 - `/update_database` - Manually update the database with new matches for all players.
 - `/add_player_to_database [username] [tagline]` - Add a new player to track.
-- `/generate_card [summoner_name] [gamemode] [sort_by] [sort_order] [min_games]` - Generate a beautiful visual stat card (uses autocomplete for summoner name).
+- `/generate_card [summoner_name] [gamemode] [sort_by] [sort_order] [min_games] [year]` - Generate a beautiful visual stat card (uses autocomplete for summoner name).
 - `/generate_champion_card [gamemode] [champion]` - Generate a visual stat card summarizing a champion's performance across all players (uses autocomplete for champion).
-- `/populate_champions_table` - Populates the champions table with the latest data (usually only needed once during setup or after major patches).
+- `/generate_leaderboard [gamemode] [period] [limit] [min_games]` - Displays KDA, Win Rate, and DPM leaderboards for tracked players as a card.
+- `/apply_lol_update` - Updates the bot's game data, including champion information. Should be used after major game patches.
 
 ## Project Structure
 
@@ -127,7 +128,7 @@ Discord_Advanced_LoL_Stats/
 ├── src/
 │   ├── assets/
 │   │   ├── gamedata/
-│   │   └── templates/
+│   │   ├── templates/
 │   ├── cogs/
 │   │   ├── CardGenerator.py
 │   │   ├── Commands.py

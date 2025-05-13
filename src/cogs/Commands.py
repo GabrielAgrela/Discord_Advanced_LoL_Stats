@@ -277,8 +277,13 @@ class Commands(commands.Cog):
             description="Sort order (ascending or descending)"
         ),
         min_games: int = commands.Param(
-            default=4,
+            default=3,
             description="Minimum number of games required per champion"
+        ),
+        year: str = commands.Param(
+            choices=["2023", "2024", "2025"],
+            default="2025",
+            description="Year to show stats for"
         )
     ):
         """
@@ -302,7 +307,8 @@ class Commands(commands.Cog):
                 gamemode, 
                 sort_by=sort_by,
                 sort_order=sort_order,
-                min_games=min_games
+                min_games=min_games,
+                year=year
             )
             if not data:
                 await inter.followup.send(

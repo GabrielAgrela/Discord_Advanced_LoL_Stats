@@ -15,7 +15,7 @@ class DatabaseOperations(commands.Cog):
         self.bot = bot
         self.db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../database/lol_database.db'))
 
-    async def get_player_stats(self, username, gamemode, champion=None, limit=200, sort_by="champion games", sort_order="DESC", min_games=1) -> List[PlayerStats]:
+    async def get_player_stats(self, username, gamemode, champion=None, limit=200, sort_by="champion games", sort_order="DESC", min_games=1, year=None) -> List[PlayerStats]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -35,14 +35,18 @@ class DatabaseOperations(commands.Cog):
         # Validate sort order
         sort_order = "DESC" if sort_order.upper() not in ["ASC", "DESC"] else sort_order.upper()
 
-        base_query = '''
+        # Add year filter to base query if year is provided
+        year_filter = f"AND strftime('%Y', m.game_creation) = '{year}'" if year else ""
+
+        base_query = f'''
         WITH base_data AS (
             SELECT p.*, m.game_duration, m.game_creation
             FROM participants p
             JOIN matches m ON p.match_id = m.match_id
             WHERE LOWER(p.riot_id_game_name) = LOWER(?)
             AND LOWER(m.game_mode) = LOWER(?)
-            {champion_filter}
+            {year_filter}
+            {{champion_filter}}
         ),
         champion_stats AS (
             SELECT 
@@ -259,7 +263,7 @@ class DatabaseOperations(commands.Cog):
             ROUND(
                 SUM(
                     CASE 
-                        WHEN strftime('%Y', m.game_creation) = '2024' 
+                        WHEN strftime('%Y', m.game_creation) = '2025' 
                         THEN p.time_played 
                         ELSE 0 
                     END

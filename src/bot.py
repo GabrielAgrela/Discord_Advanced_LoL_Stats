@@ -12,6 +12,7 @@ class LoLStatsBot(commands.InteractionBot):
         
         # Initialize botlol_channel_id to None, will be set in on_ready
         self.botlol_channel_id = None
+        self.current_game_patch = "15.2.1"
         
         super().__init__(
             intents=intents,
@@ -36,6 +37,9 @@ class LoLStatsBot(commands.InteractionBot):
                 channel = await guild.create_text_channel("botlol")
             if self.botlol_channel_id is None:
                 self.botlol_channel_id = channel.id
+
+        versions = await self.get_cog("RiotAPIOperations").get_versions()
+        self.current_game_patch = versions[0] if versions else None
        # await self.get_cog("Loops").check_if_in_game()
 
     async def on_guild_join(self, guild: disnake.Guild):

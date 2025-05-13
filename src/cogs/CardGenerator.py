@@ -467,7 +467,8 @@ class CardGenerator(commands.Cog):
             latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"
             
             # Try to load the profile icon
-            profile_icon_path = os.path.join(self.assets_path, "gamedata", latest_patch, "img", "profileicon", f"{profile_icon_id}.png")
+            profile_icon_path = os.path.join(self.assets_path, "gamedata", self.bot.current_game_patch, "img", "profileicon", f"{profile_icon_id}.png")
+            
             try:
                 if os.path.exists(profile_icon_path):
                     with open(profile_icon_path, "rb") as img_file:
@@ -1091,7 +1092,7 @@ class CardGenerator(commands.Cog):
             kda = stat.average_kda
             
             # Read and encode profile icon
-            profile_icon_path = os.path.join(self.assets_path, "gamedata", "15.1.1", "img", "profileicon", f"{stat.profile_icon}.png")
+            profile_icon_path = os.path.join(self.assets_path, "gamedata", self.bot.current_game_patch, "img", "profileicon", f"{stat.profile_icon}.png")
             try:
                 with open(profile_icon_path, "rb") as image_file:
                     encoded_profile_icon = base64.b64encode(image_file.read()).decode()

@@ -68,7 +68,7 @@ class DataFormatter(commands.Cog):
     async def format_get_all_players_stats(self, data: List[UserStats]) -> str:
         # Create the stats table
         table = "```\nPlayer Time Stats:\n"
-        table += f"{'Player':<15} {'Hours':<6} {'2024h':<6} {'Games':<5} {' WR':<4} {'Avg(m)':<8} {'Pentas':<5}\n"
+        table += f"{'Player':<15} {'Hours':<6} {'2025h':<6} {'Games':<5} {' WR':<4} {'Avg(m)':<8} {'Pentas':<5}\n"
         table += "-" * 55 + "\n"
         
         for user in data:

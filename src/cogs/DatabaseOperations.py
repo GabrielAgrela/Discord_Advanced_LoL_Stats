@@ -40,7 +40,20 @@ class DatabaseOperations(commands.Cog):
 
         base_query = f'''
         WITH base_data AS (
-            SELECT p.*, m.game_duration, m.game_creation
+            SELECT 
+                p.*, 
+                m.game_duration, 
+                m.game_creation,
+                CASE
+                    WHEN m.game_duration > 0 THEN
+                        MIN(100.0, 
+                            (
+                                (COALESCE(p.total_damage_to_champions, 0) + COALESCE(p.damage_self_mitigated, 0)) /
+                                NULLIF( (1.0 + ((CAST(COALESCE(p.total_time_spent_dead, 0) AS FLOAT) / NULLIF(m.game_duration, 1) * 100.0) / 10.0)), 0) 
+                            ) / 1000.0
+                        )
+                    ELSE 0.0 
+                END AS game_normalized_combat_efficiency
             FROM participants p
             JOIN matches m ON p.match_id = m.match_id
             WHERE LOWER(p.riot_id_game_name) = LOWER(?)
@@ -53,87 +66,87 @@ class DatabaseOperations(commands.Cog):
                 champion_name,
                 COUNT(*) as total_games,
                 ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) as winrate,
-                ROUND(AVG(total_damage_to_champions / (game_duration / 60.0)), 0) as avg_damage_per_minute,
+                ROUND(AVG(COALESCE(total_damage_to_champions, 0) / NULLIF(game_duration / 60.0, 0)), 0) as avg_damage_per_minute,
                 ROUND(AVG(CASE 
-                    WHEN deaths = 0 THEN kills + assists 
-                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
+                    WHEN COALESCE(deaths, 0) = 0 THEN COALESCE(kills, 0) + COALESCE(assists, 0)
+                    ELSE CAST((COALESCE(kills, 0) + COALESCE(assists, 0)) AS FLOAT) / NULLIF(deaths, 0)
                 END), 2) as average_kda,
-                ROUND(AVG(CAST(kills AS FLOAT)), 1) as avg_kills,
-                ROUND(AVG(CAST(deaths AS FLOAT)), 1) as avg_deaths,
-                ROUND(AVG(CAST(assists AS FLOAT)), 1) as avg_assists,
-                SUM(triple_kills) as total_triples,
-                SUM(quadra_kills) as total_quadras,
-                SUM(penta_kills) as total_pentas,
-                ROUND(AVG(CAST(total_time_spent_dead AS FLOAT) / game_duration * 100), 1) as avg_time_dead_pct,
-                ROUND(AVG(vision_score), 1) as avg_vision_score,
-                ROUND(AVG(kill_participation * 100), 1) as avg_kill_participation,
-                ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as avg_damage_taken_per_min,
-                SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as total_first_bloods,
-                SUM(turret_takedowns + inhibitor_takedowns) as total_objectives,
-                ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as avg_gold_per_min,
-                ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as avg_cs_per_min,
-                MAX(largest_killing_spree) as max_killing_spree,
+                ROUND(AVG(CAST(COALESCE(kills, 0) AS FLOAT)), 1) as avg_kills,
+                ROUND(AVG(CAST(COALESCE(deaths, 0) AS FLOAT)), 1) as avg_deaths,
+                ROUND(AVG(CAST(COALESCE(assists, 0) AS FLOAT)), 1) as avg_assists,
+                SUM(COALESCE(triple_kills, 0)) as total_triples,
+                SUM(COALESCE(quadra_kills, 0)) as total_quadras,
+                SUM(COALESCE(penta_kills, 0)) as total_pentas,
+                ROUND(AVG(CAST(COALESCE(total_time_spent_dead, 0) AS FLOAT) / NULLIF(game_duration, 1) * 100), 1) as avg_time_dead_pct,
+                ROUND(AVG(COALESCE(vision_score, 0)), 1) as avg_vision_score,
+                ROUND(AVG(COALESCE(kill_participation, 0) * 100), 1) as avg_kill_participation,
+                ROUND(AVG(COALESCE(total_damage_taken, 0) / NULLIF(game_duration / 60.0, 0)), 0) as avg_damage_taken_per_min,
+                SUM(CASE WHEN COALESCE(first_blood_kill, 0) = 1 OR COALESCE(first_blood_assist, 0) = 1 THEN 1 ELSE 0 END) as total_first_bloods,
+                SUM(COALESCE(turret_takedowns, 0) + COALESCE(inhibitor_takedowns, 0)) as total_objectives,
+                ROUND(AVG(COALESCE(gold_earned, 0) / NULLIF(game_duration / 60.0, 0)), 0) as avg_gold_per_min,
+                ROUND(AVG(COALESCE(total_minions_killed, 0) / NULLIF(game_duration / 60.0, 0)), 1) as avg_cs_per_min,
+                MAX(COALESCE(largest_killing_spree, 0)) as max_killing_spree,
                 MAX(CASE 
-                    WHEN deaths = 0 THEN kills + assists 
-                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
-                END) as max_kda
+                    WHEN COALESCE(deaths, 0) = 0 THEN COALESCE(kills, 0) + COALESCE(assists, 0)
+                    ELSE CAST((COALESCE(kills, 0) + COALESCE(assists, 0)) AS FLOAT) / NULLIF(deaths, 0)
+                END) as max_kda,
+                ROUND(AVG(game_normalized_combat_efficiency), 2) as avg_combat_efficiency
             FROM base_data
             GROUP BY champion_name
             HAVING total_games >= ?
         ),
         overall_stats AS (
             SELECT 
-                ROUND(AVG(kill_participation * 100), 1) as overall_kill_participation,
-                MAX(largest_killing_spree) as overall_max_killing_spree,
-                (SELECT p2.champion_name FROM base_data p2 WHERE p2.largest_killing_spree = (SELECT MAX(largest_killing_spree) FROM base_data)) as max_killing_spree_champion,
-                SUM(CASE WHEN first_blood_kill = 1 OR first_blood_assist = 1 THEN 1 ELSE 0 END) as overall_first_bloods,
-                SUM(turret_takedowns + inhibitor_takedowns) as overall_objectives,
-                ROUND(AVG(gold_earned / (game_duration / 60.0)), 0) as overall_gold_per_min,
-                ROUND(AVG(total_damage_taken / (game_duration / 60.0)), 0) as overall_damage_taken_per_min,
-                ROUND(AVG(total_minions_killed / (game_duration / 60.0)), 1) as overall_cs_per_min,
+                ROUND(AVG(COALESCE(kill_participation, 0) * 100), 1) as overall_kill_participation,
+                MAX(COALESCE(largest_killing_spree, 0)) as overall_max_killing_spree,
+                (SELECT p2.champion_name FROM base_data p2 WHERE p2.largest_killing_spree = (SELECT MAX(COALESCE(largest_killing_spree, 0)) FROM base_data) ORDER BY p2.game_creation DESC LIMIT 1) as max_killing_spree_champion,
+                SUM(CASE WHEN COALESCE(first_blood_kill, 0) = 1 OR COALESCE(first_blood_assist, 0) = 1 THEN 1 ELSE 0 END) as overall_first_bloods,
+                SUM(COALESCE(turret_takedowns, 0) + COALESCE(inhibitor_takedowns, 0)) as total_objectives,
+                ROUND(AVG(COALESCE(gold_earned, 0) / NULLIF(game_duration / 60.0, 0)), 0) as overall_gold_per_min,
+                ROUND(AVG(COALESCE(total_damage_taken, 0) / NULLIF(game_duration / 60.0, 0)), 0) as overall_damage_taken_per_min,
+                ROUND(AVG(COALESCE(total_minions_killed, 0) / NULLIF(game_duration / 60.0, 0)), 1) as overall_cs_per_min,
                 MAX(CASE 
-                    WHEN deaths = 0 THEN kills + assists 
-                    ELSE CAST((kills + assists) AS FLOAT) / deaths 
+                    WHEN COALESCE(deaths, 0) = 0 THEN COALESCE(kills, 0) + COALESCE(assists, 0)
+                    ELSE CAST((COALESCE(kills, 0) + COALESCE(assists, 0)) AS FLOAT) / NULLIF(deaths, 0)
                 END) as overall_max_kda,
-                (SELECT p2.champion_name FROM base_data p2 WHERE (CASE WHEN p2.deaths = 0 THEN p2.kills + p2.assists ELSE CAST((p2.kills + p2.assists) AS FLOAT) / p2.deaths END) = 
-                    (SELECT MAX(CASE WHEN deaths = 0 THEN kills + assists ELSE CAST((kills + assists) AS FLOAT) / deaths END) FROM base_data)) as max_kda_champion,
-                ROUND(AVG(vision_score), 1) as overall_vision_score,
+                (SELECT p2.champion_name FROM base_data p2 WHERE (CASE WHEN COALESCE(p2.deaths, 0) = 0 THEN COALESCE(p2.kills, 0) + COALESCE(p2.assists, 0) ELSE CAST((COALESCE(p2.kills, 0) + COALESCE(p2.assists, 0)) AS FLOAT) / NULLIF(p2.deaths, 0) END) = 
+                    (SELECT MAX(CASE WHEN COALESCE(deaths, 0) = 0 THEN COALESCE(kills, 0) + COALESCE(assists, 0) ELSE CAST((COALESCE(kills, 0) + COALESCE(assists, 0)) AS FLOAT) / NULLIF(deaths, 0) END) FROM base_data) ORDER BY p2.game_creation DESC LIMIT 1) as max_kda_champion,
+                ROUND(AVG(COALESCE(vision_score, 0)), 1) as overall_vision_score,
                 (SELECT summoner_level FROM base_data ORDER BY game_creation DESC LIMIT 1) as latest_summoner_level,
                 (SELECT profile_icon FROM base_data ORDER BY game_creation DESC LIMIT 1) as latest_profile_icon
             FROM base_data
         )
         SELECT 
-            champion_name,
-            total_games as champion_games,
-            winrate,
-            avg_damage_per_minute,
-            average_kda,
-            (SELECT COUNT(*) FROM base_data) as total_games_overall,
-            (SELECT COUNT(DISTINCT champion_name) FROM base_data) as unique_champions_played,
+            cs.champion_name,                                                               -- 0
+            cs.total_games as champion_games,                                               -- 1
+            cs.winrate,                                                                     -- 2
+            cs.avg_damage_per_minute,                                                       -- 3
+            cs.average_kda,                                                                 -- 4
+            (SELECT COUNT(*) FROM base_data) as total_games_overall,                        -- 5
+            (SELECT COUNT(DISTINCT champion_name) FROM base_data) as unique_champions_played, -- 6
             ROUND(CAST((SELECT COUNT(DISTINCT champion_name) FROM base_data) AS FLOAT) / 
-                (SELECT COUNT(*) FROM base_data) * 100, 1) as unique_champ_ratio,
-            (SELECT MIN(game_creation) FROM base_data) as oldest_game,
-            ROUND(CAST((SELECT SUM(game_duration) FROM base_data) AS FLOAT) / 3600, 1) as total_hours_played,
-            total_triples,
-            total_quadras,
-            total_pentas,
-            (SELECT SUM(penta_kills) FROM base_data) as total_pentas_overall,
-            (SELECT ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) FROM base_data) as total_winrate,
-            avg_time_dead_pct,
-            (SELECT overall_vision_score FROM overall_stats) as avg_vision_score,
-            (SELECT overall_kill_participation FROM overall_stats) as avg_kill_participation,
-            (SELECT overall_damage_taken_per_min FROM overall_stats) as avg_damage_taken_per_min,
-            (SELECT overall_first_bloods FROM overall_stats) as total_first_bloods,
-            (SELECT overall_objectives FROM overall_stats) as total_objectives,
-            (SELECT overall_gold_per_min FROM overall_stats) as avg_gold_per_min,
-            avg_cs_per_min,
-            (SELECT overall_max_killing_spree FROM overall_stats) as max_killing_spree,
-            (SELECT overall_max_kda FROM overall_stats) as max_kda,
-            (SELECT max_killing_spree_champion FROM overall_stats) as max_killing_spree_champion,
-            (SELECT max_kda_champion FROM overall_stats) as max_kda_champion,
-            (SELECT latest_summoner_level FROM overall_stats) as summoner_level,
-            (SELECT latest_profile_icon FROM overall_stats) as profile_icon
-        FROM champion_stats
+                NULLIF((SELECT COUNT(*) FROM base_data), 0) * 100, 1) as unique_champ_ratio, -- 7
+            (SELECT MIN(game_creation) FROM base_data) as oldest_game,                      -- 8
+            ROUND(CAST((SELECT SUM(COALESCE(game_duration, 0)) FROM base_data) AS FLOAT) / 3600, 1) as total_hours_played, -- 9
+            cs.total_triples,                                                               -- 10
+            cs.total_quadras,                                                               -- 11
+            cs.total_pentas,                                                                -- 12
+            (SELECT SUM(COALESCE(penta_kills, 0)) FROM base_data) as total_pentas_overall, -- 13
+            (SELECT ROUND(AVG(CASE WHEN wins = 1 THEN 100.0 ELSE 0 END), 1) FROM base_data) as total_winrate, -- 14
+            cs.avg_time_dead_pct,                                                           -- 15
+            (SELECT overall_vision_score FROM overall_stats) as avg_vision_score,           -- 16
+            (SELECT overall_kill_participation FROM overall_stats) as avg_kill_participation, -- 17
+            (SELECT overall_damage_taken_per_min FROM overall_stats) as avg_damage_taken_per_min, -- 18
+            (SELECT overall_first_bloods FROM overall_stats) as total_first_bloods,         -- 19
+            (SELECT overall_objectives FROM overall_stats) as total_objectives,             -- 20
+            (SELECT overall_gold_per_min FROM overall_stats) as avg_gold_per_min,           -- 21
+            cs.avg_cs_per_min,                                                              -- 22
+            (SELECT overall_max_killing_spree FROM overall_stats) as max_killing_spree,     -- 23
+            (SELECT overall_max_kda FROM overall_stats) as max_kda,                         -- 24
+            (SELECT max_killing_spree_champion FROM overall_stats) as max_killing_spree_champion, -- 25
+            (SELECT max_kda_champion FROM overall_stats) as max_kda_champion,               -- 26
+            cs.avg_combat_efficiency                                                        -- 27
+        FROM champion_stats cs
         ORDER BY {sort_column} {sort_order}, champion_games DESC
         LIMIT ?;
         '''
@@ -200,6 +213,7 @@ class DatabaseOperations(commands.Cog):
                 max_kda=row[24],
                 max_killing_spree_champion=row[25],
                 max_kda_champion=row[26],
+                avg_combat_efficiency=row[27], # New field
                 summoner_level=latest_info[0] if latest_info else 0,
                 profile_icon=latest_info[1] if latest_info else 0
             ))
@@ -233,7 +247,8 @@ class DatabaseOperations(commands.Cog):
                 max_kda=0.0,
                 max_killing_spree_champion="",
                 max_kda_champion="",
-                summoner_level=latest_info[0] if latest_info else 0,
+                avg_combat_efficiency=0.0, # New field
+                summoner_level=latest_info[0] if latest_info else 0, 
                 profile_icon=latest_info[1] if latest_info else 0
             ))
         return player_stats

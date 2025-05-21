@@ -192,7 +192,7 @@ class PlayerStats:
                  avg_kill_participation: float, avg_damage_taken_per_min: float, total_first_bloods: int,
                  total_objectives: int, avg_gold_per_min: float, max_killing_spree: int, max_kda: float,
                  max_killing_spree_champion: str, max_kda_champion: str, summoner_level: int, profile_icon: int,
-                 avg_cs_per_min: float = 0.0):
+                 avg_cs_per_min: float = 0.0, avg_combat_efficiency: float = 0.0):
         self.champion_name = champion_name
         self.champion_games = champion_games
         self.winrate = winrate
@@ -222,6 +222,7 @@ class PlayerStats:
         self.summoner_level = summoner_level
         self.profile_icon = profile_icon
         self.avg_cs_per_min = avg_cs_per_min
+        self.avg_combat_efficiency = avg_combat_efficiency
 
 @dataclass
 class PlayerFriendStats:

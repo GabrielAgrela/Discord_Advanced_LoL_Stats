@@ -117,20 +117,32 @@ class Loops(commands.Cog):
                         try:
                             channel = await self.bot.fetch_channel(message_info['channel_id'])
                             message = await channel.fetch_message(message_info['message_id'])
+                            
+                            game_mode_finished = message_info.get('game_mode') # Get game_mode
+
+                            # Initial message edit
                             await message.edit(embed=disnake.Embed(
-                                title="🎮 Game Over - Updating Database...",
-                                description="Please wait while we update match data...",
+                                title="🎮 Game Over - Processing...", # Changed title and description
+                                description="Please wait while we process match data...",
                                 color=disnake.Color.gold()
                             ))
                             
-                            # First update database with new match data and wait for it to complete
-                            # This is crucial - we need to await this call to ensure the database is updated
-                            update_result = await self.bot.get_cog("RiotAPIOperations").update_database(announce=True)
+                            update_result = 0 
+                            description_for_next_step = ""
+
+                            if game_mode_finished != 'BRAWL':
+                                # First update database with new match data and wait for it to complete
+                                # This is crucial - we need to await this call to ensure the database is updated
+                                update_result = await self.bot.get_cog("RiotAPIOperations").update_database(announce=True)
+                                description_for_next_step = f"Database updated with {update_result} new matches. Generating player cards..."
+                            else:
+                                # For BRAWL games, skip database update
+                                description_for_next_step = "Skipped database update for BRAWL game. Generating player cards..."
                             
                             # Update the message to show we're now generating cards
                             await message.edit(embed=disnake.Embed(
                                 title="🎮 Game Over - Generating Stats...",
-                                description=f"Database updated with {update_result} new matches. Generating player cards...",
+                                description=description_for_next_step,
                                 color=disnake.Color.gold()
                             ))
                             
@@ -146,61 +158,57 @@ class Loops(commands.Cog):
                                 match_participants = await self.bot.get_cog("DatabaseOperations").get_match_participants(full_game_id)
                                 
                                 if match_info and match_participants:
-                                    game_mode = match_info[0] # Assuming index 0 is game mode/type
-                                    game_start_date = match_info[3]
+                                    game_start_date = match_info[3] # Used for timestamp
 
-                                    # Check if the game is a custom game
-                                    if game_mode == "CUSTOM": # Using "CUSTOM" as the identifier for custom games
+                                    # Common: Prepare participant list for summary
+                                    tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
+                                    tracked_puuids = {user.puuid for user in tracked_users}
+                                    tracked_participants_list = [
+                                        f"{p['riot_id_game_name']} ({p['champion_name']})"
+                                        for p in match_participants if p['puuid'] in tracked_puuids
+                                    ]
+
+                                    # Common: Create base summary embed (title and color will be set per case)
+                                    summary_embed = disnake.Embed()
+                                    summary_embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
+                                    if tracked_participants_list:
+                                        summary_embed.add_field(name="Players", value="\n".join(tracked_participants_list), inline=False)
+                                    else:
+                                        summary_embed.add_field(name="Players", value="No tracked players found in this match", inline=False)
+
+                                    if game_mode_finished == "CUSTOM":
                                         await message.edit(embed=disnake.Embed(
                                             title="🎮 Custom Game Over",
                                             description="Stats generation skipped for custom games.",
                                             color=disnake.Color.orange()
                                         ))
-                                        # Skip generating cards and summary for custom games
-                                    else:
-                                        # Proceed with generating cards and summary for non-custom games
-                                        player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
+                                        # No summary or cards for CUSTOM games.
 
-                                        # Get tracked users from the database
-                                        tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
-                                        tracked_puuids = {user.puuid for user in tracked_users}
+                                    elif game_mode_finished == "BRAWL":
+                                        await message.edit(embed=disnake.Embed(
+                                            title="🎮 BRAWL Game Over",
+                                            description="Database update and player card generation skipped for BRAWL games.",
+                                            color=disnake.Color.blue() 
+                                        ))
+                                        summary_embed.title = "Match Summary: BRAWL"
+                                        summary_embed.color = disnake.Color.blue()
+                                        await channel.send(embed=summary_embed)
+                                        # No player cards for BRAWL games.
+
+                                    else: # Regular game (not CUSTOM, not BRAWL)
+                                        # For regular games, the original `message` showing "Generating Stats..." remains until deletion.
                                         
-                                        # Filter participants to only include tracked users
-                                        tracked_participants = []
-                                        for player in match_participants:
-                                            if player['puuid'] in tracked_puuids:
-                                                tracked_participants.append(f"{player['riot_id_game_name']} ({player['champion_name']})")
+                                        # Set title and color for regular game summary
+                                        summary_embed.title = f"Match Summary: {match_info[0]}" # Use game_mode from DB for display
+                                        summary_embed.color = disnake.Color.blue()
                                         
-                                        # Create the embed
-                                        embed = disnake.Embed(
-                                            title=f"Match Summary: {game_mode}",
-                                            description="",
-                                            color=disnake.Color.blue()
-                                        )
-                                        
-                                        # Add timestamp
-                                        embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
-                                        
-                                        # Add tracked players field
-                                        if tracked_participants:
-                                            embed.add_field(
-                                                name="Players",
-                                                value="\n".join(tracked_participants),
-                                                inline=False
-                                            )
-                                        else:
-                                            embed.add_field(
-                                                name="Players",
-                                                value="No tracked players found in this match",
-                                                inline=False
-                                            )
-                                        
-                                        # Send the match summary embed
-                                        await channel.send(embed=embed)
+                                        # Send summary first
+                                        await channel.send(embed=summary_embed)
                                     
-                                        # Send a message for each player card
-                                        for card in player_cards:
-                                            await channel.send(file=card)
+                                        # Generate and send player cards
+                                        player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
+                                        for card_file in player_cards:
+                                            await channel.send(file=card_file)
                                 else:
                                     # Handle cases where match data couldn't be fetched
                                     error_embed = disnake.Embed(
@@ -266,7 +274,8 @@ class Loops(commands.Cog):
                                     # Store the message info for later cleanup
                                     self.live_game_messages[game_id] = {
                                         'message_id': message.id,
-                                        'channel_id': channel.id
+                                        'channel_id': channel.id,
+                                        'game_mode': game_info['gameMode']
                                     }
                 
             except Exception as e:

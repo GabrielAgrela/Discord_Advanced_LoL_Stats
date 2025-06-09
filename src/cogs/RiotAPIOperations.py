@@ -74,8 +74,22 @@ class RiotAPIOperations(commands.Cog):
                             print(f"Rate limited. Waiting {retry_after} seconds before retry...")
                             await asyncio.sleep(retry_after)
                             continue
+                        elif response.status == 403:
+                            print(f"Service unavailable. Attempt {attempt + 1}/{max_retries}")
+                            #print url and params
+                            print(f"URL: {url}")
+                            print(f"Params: {params}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
                         elif response.status == 404:
                             return None
+                        elif response.status == 502:
+                            print(f"Bad Gateway. Attempt {attempt + 1}/{max_retries}")
+                            #print url and params
+                            print(f"URL: {url}")
+                            print(f"Params: {params}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
                         elif response.status == 503:
                             print(f"Service unavailable. Attempt {attempt + 1}/{max_retries}")
                             await asyncio.sleep(2 ** attempt)  # Exponential backoff

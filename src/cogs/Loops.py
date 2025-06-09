@@ -250,6 +250,11 @@ class Loops(commands.Cog):
                         if players:
                             # Sort players by winrate
                             players.sort(key=lambda x: x['stats'].winrate if x['stats'] else 0, reverse=True)
+
+                            # Skip generating live cards for unsupported BRAWL mode
+                            if game_info.get('gameMode') == 'BRAWL':
+                                print(f"Skipping live game card generation for BRAWL game {game_id}")
+                                continue
                             
                             # Find the botlol channel
                             for guild in self.bot.guilds:

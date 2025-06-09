@@ -1,0 +1,27 @@
+name: Build and Deploy Docker Container
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Stop existing containers
+      run: |
+        docker-compose down || echo "No containers to stop"
+
+    - name: Pull latest changes and rebuild
+      run: |
+        git pull origin main
+        docker-compose build --no-cache
+        docker-compose up -d
+
+    - name: Clean up unused Docker images
+      run: |
+        docker image prune -f 

@@ -51,5 +51,4 @@ config.json
 token.txt 
 src/assets/gamedata/*
 
-.github
 actions-runner

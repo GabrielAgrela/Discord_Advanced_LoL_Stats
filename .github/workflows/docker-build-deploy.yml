@@ -12,6 +12,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Copy environment file
+      run: |
+        cp /home/gabi/github/Discord_Advanced_LoL_Stats/.env ./
+
     - name: Stop existing containers
       run: |
         docker-compose down || echo "No containers to stop"

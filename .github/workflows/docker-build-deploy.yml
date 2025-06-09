@@ -9,10 +9,10 @@ jobs:
     runs-on: self-hosted
     
     steps:
-    - name: Clean up previous workspace
+    - name: Clean up problematic files
       run: |
-        sudo rm -rf ${{ github.workspace }} || true
         sudo find /home/gabi/github/Discord_Advanced_LoL_Stats/actions-runner/_work -name "__pycache__" -exec sudo rm -rf {} + 2>/dev/null || true
+        sudo find /home/gabi/github/Discord_Advanced_LoL_Stats/actions-runner/_work -name "*.pyc" -exec sudo rm -f {} + 2>/dev/null || true
 
     - name: Checkout repository
       uses: actions/checkout@v4

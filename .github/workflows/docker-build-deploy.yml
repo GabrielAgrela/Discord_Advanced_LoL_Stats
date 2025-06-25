@@ -21,28 +21,14 @@ jobs:
       run: |
         cp /home/gabi/github/Discord_Advanced_LoL_Stats/.env ./
 
-    - name: Copy existing database
-      run: |
-        # Create database directory in workspace
-        mkdir -p ./src/database
-        mkdir -p ./data
-        
-        # Copy your existing database file
-        cp /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ./src/database/
-        
-        # Set proper permissions
-        sudo chown -R 1000:1000 ./src/database
-        sudo chown -R 1000:1000 ./data
-        sudo chmod -R 755 ./src/database
-        
-        echo "Existing database copied successfully"
-
     - name: Stop existing containers
       run: |
+        cd /home/gabi/github/Discord_Advanced_LoL_Stats
         docker-compose down || echo "No containers to stop"
 
     - name: Pull latest changes and rebuild
       run: |
+        cd /home/gabi/github/Discord_Advanced_LoL_Stats
         git pull origin main
         docker-compose build --no-cache
         docker-compose up -d

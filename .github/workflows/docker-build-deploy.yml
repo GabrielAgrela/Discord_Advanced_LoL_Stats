@@ -21,6 +21,25 @@ jobs:
       run: |
         cp /home/gabi/github/Discord_Advanced_LoL_Stats/.env ./
 
+    - name: Ensure database permissions
+      run: |
+        # Debug information
+        echo "Current working directory: $(pwd)"
+        echo "Database file status:"
+        ls -la ./src/database/ || echo "src/database directory does not exist"
+        ls -la ./data/ || echo "data directory does not exist"
+        
+        # Ensure the database directory and files have correct permissions
+        sudo mkdir -p ./data
+        sudo chown -R 1000:1000 ./data || true
+        sudo chown -R 1000:1000 ./src/database || true
+        sudo chmod -R 755 ./src/database || true
+        
+        # Show final permissions
+        echo "Final permissions:"
+        ls -la ./src/database/ || echo "src/database directory issue"
+        ls -la ./data/ || echo "data directory issue"
+
     - name: Stop existing containers
       run: |
         docker-compose down || echo "No containers to stop"

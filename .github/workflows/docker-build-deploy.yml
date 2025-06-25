@@ -21,7 +21,18 @@ jobs:
       run: |
         cp /home/gabi/github/Discord_Advanced_LoL_Stats/.env ./
 
-    - name: Ensure database permissions
+    - name: Copy database file
+      run: |
+        # Copy the database file from the persistent location
+        if [ -f /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ]; then
+          echo "Copying database from persistent location..."
+          cp /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ./src/database/
+          echo "Database copied successfully"
+        else
+          echo "WARNING: Database file not found in persistent location!"
+        fi
+
+    - name: Ensure database permissions and initialization
       run: |
         # Debug information
         echo "Current working directory: $(pwd)"
@@ -34,6 +45,15 @@ jobs:
         sudo chown -R 1000:1000 ./data || true
         sudo chown -R 1000:1000 ./src/database || true
         sudo chmod -R 755 ./src/database || true
+        
+        # Ensure database file is readable and has tables
+        if [ -f ./src/database/lol_database.db ]; then
+          echo "Database file exists, checking tables:"
+          sqlite3 ./src/database/lol_database.db ".tables" || echo "Failed to read database tables"
+          echo "Database file size: $(stat -c%s ./src/database/lol_database.db) bytes"
+        else
+          echo "Database file does not exist!"
+        fi
         
         # Show final permissions
         echo "Final permissions:"

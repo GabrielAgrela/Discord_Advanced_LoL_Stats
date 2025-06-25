@@ -21,44 +21,21 @@ jobs:
       run: |
         cp /home/gabi/github/Discord_Advanced_LoL_Stats/.env ./
 
-    - name: Copy database file
+    - name: Copy existing database
       run: |
-        # Copy the database file from the persistent location
-        if [ -f /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ]; then
-          echo "Copying database from persistent location..."
-          cp /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ./src/database/
-          echo "Database copied successfully"
-        else
-          echo "WARNING: Database file not found in persistent location!"
-        fi
-
-    - name: Ensure database permissions and initialization
-      run: |
-        # Debug information
-        echo "Current working directory: $(pwd)"
-        echo "Database file status:"
-        ls -la ./src/database/ || echo "src/database directory does not exist"
-        ls -la ./data/ || echo "data directory does not exist"
+        # Create database directory in workspace
+        mkdir -p ./src/database
+        mkdir -p ./data
         
-        # Ensure the database directory and files have correct permissions
-        sudo mkdir -p ./data
-        sudo chown -R 1000:1000 ./data || true
-        sudo chown -R 1000:1000 ./src/database || true
-        sudo chmod -R 755 ./src/database || true
+        # Copy your existing database file
+        cp /home/gabi/github/Discord_Advanced_LoL_Stats/src/database/lol_database.db ./src/database/
         
-        # Ensure database file is readable and has tables
-        if [ -f ./src/database/lol_database.db ]; then
-          echo "Database file exists, checking tables:"
-          sqlite3 ./src/database/lol_database.db ".tables" || echo "Failed to read database tables"
-          echo "Database file size: $(stat -c%s ./src/database/lol_database.db) bytes"
-        else
-          echo "Database file does not exist!"
-        fi
+        # Set proper permissions
+        sudo chown -R 1000:1000 ./src/database
+        sudo chown -R 1000:1000 ./data
+        sudo chmod -R 755 ./src/database
         
-        # Show final permissions
-        echo "Final permissions:"
-        ls -la ./src/database/ || echo "src/database directory issue"
-        ls -la ./data/ || echo "data directory issue"
+        echo "Existing database copied successfully"
 
     - name: Stop existing containers
       run: |

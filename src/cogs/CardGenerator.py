@@ -467,7 +467,7 @@ class CardGenerator(commands.Cog):
             latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"
             
             # Try to load the profile icon
-            profile_icon_path = os.path.join(self.assets_path, "gamedata", self.bot.current_game_patch, "img", "profileicon", f"{profile_icon_id}.png")
+            profile_icon_path = os.path.join(self.assets_path, "gamedata", latest_patch, "img", "profileicon", f"{profile_icon_id}.png")
             
             try:
                 if os.path.exists(profile_icon_path):

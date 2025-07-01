@@ -464,7 +464,7 @@
         .table td {
             color: #f0f0f0;
             border: none;
-            padding: 0px;
+            padding: 8px 4px;
             vertical-align: middle;
             background-color: transparent !important;
             font-size: 15px;
@@ -476,6 +476,33 @@
             text-align: center;
             height: 130px;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .table td:not(:first-child) {
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.12), 
+                rgba(255, 255, 255, 0.06)) !important;
+            border-radius: 12px;
+            margin: 2px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+        }
+
+        .table td:not(:first-child):hover {
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.18), 
+                rgba(255, 255, 255, 0.10)) !important;
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                        0 0 15px rgba(255, 255, 255, 0.1);
         }
 
         .card-body {

@@ -241,3 +241,13 @@ class UserStats:
     first_game_date: str
     total_pentas: int
     winrate: float 
+
+@dataclass
+class PendingMatch:
+    match_id: str
+    game_mode: str
+    channel_id: int
+    message_id: int
+    attempts: int
+    created_at: str
+    last_attempt: str 

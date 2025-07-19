@@ -1053,5 +1053,82 @@ class DatabaseOperations(commands.Cog):
         # Convert DPM to int here
         return [(name, int(dpm) if dpm is not None else 0, games, icon) for name, dpm, games, icon in results]
 
+    async def create_pending_matches_table(self):
+        """Create the pending_matches table if it doesn't exist"""
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_matches (
+                match_id TEXT PRIMARY KEY,
+                game_mode TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                attempts INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_attempt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    async def add_pending_match(self, match_id: str, game_mode: str, channel_id: int, message_id: int):
+        """Add a match to the pending matches queue"""
+        await self.create_pending_matches_table()  # Ensure table exists
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO pending_matches 
+            (match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt)
+            VALUES (?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+        """, (match_id, game_mode, channel_id, message_id))
+        conn.commit()
+        conn.close()
+
+    async def get_pending_matches(self) -> list:
+        """Get all pending matches that need to be retried"""
+        await self.create_pending_matches_table()  # Ensure table exists
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt
+            FROM pending_matches
+            WHERE attempts < 10  -- Maximum 10 attempts
+            ORDER BY created_at ASC
+        """)
+        results = cursor.fetchall()
+        conn.close()
+        return results
+
+    async def update_pending_match_attempt(self, match_id: str):
+        """Increment the attempt counter and update last_attempt timestamp"""
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE pending_matches 
+            SET attempts = attempts + 1, last_attempt = datetime('now')
+            WHERE match_id = ?
+        """, (match_id,))
+        conn.commit()
+        conn.close()
+
+    async def remove_pending_match(self, match_id: str):
+        """Remove a match from the pending matches queue"""
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM pending_matches WHERE match_id = ?", (match_id,))
+        conn.commit()
+        conn.close()
+
+    async def cleanup_old_pending_matches(self, days: int = 7):
+        """Remove pending matches older than specified days"""
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM pending_matches 
+            WHERE created_at < datetime('now', '-{} days')
+        """.format(days))
+        conn.commit()
+        conn.close()
+
 def setup(bot):
     bot.add_cog(DatabaseOperations(bot))

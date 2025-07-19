@@ -455,5 +455,117 @@ class Commands(commands.Cog):
             traceback.print_exc()
             await inter.followup.send(f"An error occurred while generating the leaderboard card.")
 
+    @commands.slash_command()
+    async def check_pending_matches(self, inter: disnake.ApplicationCommandInteraction):
+        """Check the status of pending CHERRY matches in the queue"""
+        await inter.response.defer()
+        
+        try:
+            pending_matches = await self.bot.get_cog("DatabaseOperations").get_pending_matches()
+            
+            if not pending_matches:
+                await inter.followup.send(embed=disnake.Embed(
+                    title="📋 Pending Matches",
+                    description="No pending matches in the queue.",
+                    color=disnake.Color.green()
+                ))
+                return
+            
+            # Create embed with pending matches info
+            embed = disnake.Embed(
+                title="📋 Pending CHERRY Matches",
+                description=f"Found {len(pending_matches)} pending matches:",
+                color=disnake.Color.orange()
+            )
+            
+            for match_data in pending_matches[:10]:  # Show max 10 matches
+                match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt = match_data
+                
+                # Format the timestamps
+                try:
+                    from datetime import datetime
+                    created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    last_attempt_dt = datetime.fromisoformat(last_attempt.replace('Z', '+00:00'))
+                    
+                    embed.add_field(
+                        name=f"Match {match_id}",
+                        value=f"**Mode:** {game_mode}\n**Attempts:** {attempts}/10\n**Created:** {created_dt.strftime('%Y-%m-%d %H:%M:%S')}\n**Last Attempt:** {last_attempt_dt.strftime('%Y-%m-%d %H:%M:%S')}",
+                        inline=True
+                    )
+                except:
+                    embed.add_field(
+                        name=f"Match {match_id}",
+                        value=f"**Mode:** {game_mode}\n**Attempts:** {attempts}/10\n**Created:** {created_at}\n**Last Attempt:** {last_attempt}",
+                        inline=True
+                    )
+            
+            if len(pending_matches) > 10:
+                embed.add_field(
+                    name="Note",
+                    value=f"Showing 10 of {len(pending_matches)} pending matches.",
+                    inline=False
+                )
+            
+            await inter.followup.send(embed=embed)
+            
+        except Exception as e:
+            print(f"Error checking pending matches: {e}")
+            await inter.followup.send(f"An error occurred while checking pending matches: {str(e)}")
+
+    @commands.slash_command()
+    async def retry_pending_match(
+        self, 
+        inter: disnake.ApplicationCommandInteraction,
+        match_id: str = commands.Param(description="The match ID to retry (e.g., EUW1_1234567890)")
+    ):
+        """Manually retry processing a specific pending CHERRY match"""
+        await inter.response.defer()
+        
+        try:
+            # Check if the match is in the pending queue
+            pending_matches = await self.bot.get_cog("DatabaseOperations").get_pending_matches()
+            match_found = None
+            
+            for match_data in pending_matches:
+                if match_data[0] == match_id:  # match_id is the first element
+                    match_found = match_data
+                    break
+            
+            if not match_found:
+                await inter.followup.send(embed=disnake.Embed(
+                    title="❌ Match Not Found",
+                    description=f"Match {match_id} is not in the pending queue.",
+                    color=disnake.Color.red()
+                ))
+                return
+            
+            match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt = match_found
+            
+            # Try to fetch the match data from the API
+            match_data = await self.bot.get_cog("RiotAPIOperations").get_match_data(match_id)
+            
+            if match_data:
+                # Match data was successfully fetched
+                await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
+                
+                await inter.followup.send(embed=disnake.Embed(
+                    title="✅ Match Processed Successfully",
+                    description=f"Match {match_id} has been successfully processed and removed from the pending queue.",
+                    color=disnake.Color.green()
+                ))
+            else:
+                # Match data still not available
+                await self.bot.get_cog("DatabaseOperations").update_pending_match_attempt(match_id)
+                
+                await inter.followup.send(embed=disnake.Embed(
+                    title="⏳ Match Still Pending",
+                    description=f"Match {match_id} is still not available in the Riot API.\nAttempt count increased to {attempts + 1}/10.",
+                    color=disnake.Color.orange()
+                ))
+                
+        except Exception as e:
+            print(f"Error retrying pending match: {e}")
+            await inter.followup.send(f"An error occurred while retrying the match: {str(e)}")
+
 def setup(bot):
     bot.add_cog(Commands(bot)) 

@@ -199,3 +199,14 @@ CREATE TABLE participants (
         FOREIGN KEY (match_id) REFERENCES matches (match_id),
         UNIQUE(match_id, puuid)
     ) """
+
+CREATE TABLE pending_matches (
+    match_id TEXT PRIMARY KEY,
+    game_mode TEXT NOT NULL,
+    channel_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_attempt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""

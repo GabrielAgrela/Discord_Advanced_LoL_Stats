@@ -1055,7 +1055,7 @@ class DatabaseOperations(commands.Cog):
 
     async def create_pending_matches_table(self):
         """Create the pending_matches table if it doesn't exist"""
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pending_matches (
@@ -1074,7 +1074,7 @@ class DatabaseOperations(commands.Cog):
     async def add_pending_match(self, match_id: str, game_mode: str, channel_id: int, message_id: int):
         """Add a match to the pending matches queue"""
         await self.create_pending_matches_table()  # Ensure table exists
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO pending_matches 
@@ -1087,7 +1087,7 @@ class DatabaseOperations(commands.Cog):
     async def get_pending_matches(self) -> list:
         """Get all pending matches that need to be retried"""
         await self.create_pending_matches_table()  # Ensure table exists
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt
@@ -1101,7 +1101,7 @@ class DatabaseOperations(commands.Cog):
 
     async def update_pending_match_attempt(self, match_id: str):
         """Increment the attempt counter and update last_attempt timestamp"""
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE pending_matches 
@@ -1113,7 +1113,7 @@ class DatabaseOperations(commands.Cog):
 
     async def remove_pending_match(self, match_id: str):
         """Remove a match from the pending matches queue"""
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM pending_matches WHERE match_id = ?", (match_id,))
         conn.commit()
@@ -1121,7 +1121,7 @@ class DatabaseOperations(commands.Cog):
 
     async def cleanup_old_pending_matches(self, days: int = 7):
         """Remove pending matches older than specified days"""
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             DELETE FROM pending_matches 

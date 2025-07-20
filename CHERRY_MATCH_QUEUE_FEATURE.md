@@ -50,10 +50,7 @@ CHERRY matches may take longer to become available in the API.
 ```
 
 **When Available:**
-```
-🎮 CHERRY Match Found - Processing...
-Match data is now available. Generating player cards...
-```
+The original "CHERRY Match Queued" message is edited to show the match summary and player card instead of sending new messages.
 
 ### 5. New Slash Commands
 - `/check_pending_matches`: View all matches currently in the queue

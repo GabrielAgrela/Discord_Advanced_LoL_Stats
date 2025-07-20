@@ -365,21 +365,20 @@ class Loops(commands.Cog):
                                 else:
                                     summary_embed.add_field(name="Players", value="No tracked players found in this match", inline=False)
                                 
-                                # Generate player cards
-                                player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
+                                # Send summary
+                                await channel.send(embed=summary_embed)
                                 
-                                # Edit the original message with the match summary and first card
-                                if player_cards:
-                                    await message.edit(embed=summary_embed, file=player_cards[0])
-                                    # Send additional cards if there are more than one
-                                    for card_file in player_cards[1:]:
-                                        await channel.send(file=card_file)
-                                else:
-                                    # If no cards were generated, just edit with the summary
-                                    await message.edit(embed=summary_embed)
+                                # Generate and send player cards
+                                player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
+                                for card_file in player_cards:
+                                    await channel.send(file=card_file)
                                 
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
+                                
+                                # Delete the original message
+                                await asyncio.sleep(5)
+                                await message.delete()
                                 
                                 print(f"Successfully processed pending CHERRY match: {match_id}")
                                 
@@ -424,8 +423,8 @@ class Loops(commands.Cog):
             except Exception as e:
                 print(f"Error in process_pending_matches loop: {e}")
                 
-            # Check every 2 minutes
-            await asyncio.sleep(120)
+            # Check every 5 minutes
+            await asyncio.sleep(300)
 
 def setup(bot):
     bot.add_cog(Loops(bot))

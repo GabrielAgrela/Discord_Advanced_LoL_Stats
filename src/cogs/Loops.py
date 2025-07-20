@@ -85,17 +85,20 @@ class Loops(commands.Cog):
                                 if tracked_user:
                                     champion = await self.bot.get_cog("DatabaseOperations").get_champion(participant['championId'])
                                     
+                                    # Handle case where champion lookup returns None
+                                    champion_name = champion.replace(" ", "").replace("'", "") if champion else "Unknown"
+                                    
                                     stats = await self.bot.get_cog("DatabaseOperations").get_player_stats(
                                         tracked_user.riot_id_game_name, 
                                         game_data['gameMode'], 
-                                        champion.replace(" ", "").replace("'", "")
+                                        champion_name
                                     )
 
                                     # Only add to players list and update last_game_played if not announced yet
                                     if game_id != str(tracked_user.last_game_played):
                                         games_data[game_id]['players'].append({
                                             'name': tracked_user.riot_id_game_name,
-                                            'champion': champion,
+                                            'champion': champion if champion else "Unknown",
                                             'gameMode': game_data['gameMode'],
                                             'stats': stats[0] if stats else None,
                                             'guild_id': tracked_user.guild_id,

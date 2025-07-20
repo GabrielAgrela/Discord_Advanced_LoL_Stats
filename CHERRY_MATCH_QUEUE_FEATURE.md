@@ -57,7 +57,7 @@ The original "CHERRY Match Queued" message is edited to show the match summary a
 - `/retry_pending_match <match_id>`: Manually retry a specific match
 
 ### 6. Background Processing
-- **Loop Frequency**: Checks pending matches every 5 minutes
+- **Loop Frequency**: Checks pending matches every 2 minutes
 - **Smart Processing**: Only processes matches that haven't exceeded retry limit
 - **Error Handling**: Gracefully handles Discord message/channel deletions
 - **Logging**: Comprehensive logging for debugging and monitoring
@@ -72,12 +72,13 @@ The original "CHERRY Match Queued" message is edited to show the match summary a
 ### 8. Benefits
 - **No More False Errors**: CHERRY matches no longer show error messages
 - **Automatic Processing**: Matches are processed as soon as they become available
-- **User Transparency**: Clear messaging about queue status
+- **User Transparency**: Clear messaging about queue status, with the original message being edited to show results
+- **Cleaner Chat**: No additional messages sent - the queued message is updated in-place
 - **Administrative Control**: Manual retry and monitoring capabilities
 - **Resource Efficient**: Limited retry attempts and automatic cleanup prevent resource waste
 
 ### 9. Configuration
-- **Retry Interval**: 5 minutes (configurable in `process_pending_matches()`)
+- **Retry Interval**: 2 minutes (configurable in `process_pending_matches()`)
 - **Max Attempts**: 10 retries per match
 - **Cleanup Period**: 7 days for old matches
 - **Queue Limit**: No hard limit, but filtered by attempt count

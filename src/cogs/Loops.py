@@ -368,15 +368,16 @@ class Loops(commands.Cog):
                                 # Generate player cards
                                 player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
                                 
-                                # Edit the original message with the match summary and first card
-                                if player_cards:
-                                    await message.edit(embed=summary_embed, file=player_cards[0])
-                                    # Send additional cards if there are more than one
-                                    for card_file in player_cards[1:]:
-                                        await channel.send(file=card_file)
-                                else:
-                                    # If no cards were generated, just edit with the summary
-                                    await message.edit(embed=summary_embed)
+                                # Send the match summary first
+                                await channel.send(embed=summary_embed)
+                                
+                                # Send all player cards
+                                for card_file in player_cards:
+                                    await channel.send(file=card_file)
+                                
+                                # Delete the original "CHERRY Match Queued" message after a delay
+                                await asyncio.sleep(5)
+                                await message.delete()
                                 
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)

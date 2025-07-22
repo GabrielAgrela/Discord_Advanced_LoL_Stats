@@ -226,7 +226,6 @@ class Loops(commands.Cog):
                                         await message.edit(embed=queue_embed)
                                         # Don't delete the message - it will be updated when the match is processed
                                         skip_deletion = True
-                                        print(f"CHERRY match {full_game_id} queued for processing (message_id: {message.id})")
                                     else:
                                         # For non-CHERRY matches, show error as before
                                         error_embed = disnake.Embed(
@@ -338,8 +337,6 @@ class Loops(commands.Cog):
                                 channel = await self.bot.fetch_channel(channel_id)
                                 message = await channel.fetch_message(message_id)
                                 
-                                print(f"Processing CHERRY match {match_id} (message_id: {message_id})")
-                                
                                 # Update message to show we're processing
                                 await message.edit(embed=disnake.Embed(
                                     title="🎮 CHERRY Match Found - Processing...",
@@ -368,23 +365,19 @@ class Loops(commands.Cog):
                                 else:
                                     summary_embed.add_field(name="Players", value="No tracked players found in this match", inline=False)
                                 
-                                # Edit the original message with just the match summary (no cards)
-                                await message.edit(embed=summary_embed)
-                                
-                                # Generate and send all player cards as separate messages
+                                # Generate player cards
                                 player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
-                                if player_cards:
-                                    print(f"Generated {len(player_cards)} player cards for CHERRY match {match_id}")
-                                    # Send all player cards as new messages
-                                    for card_file in player_cards:
-                                        await channel.send(file=card_file)
-                                else:
-                                    # If no cards were generated, send an info message
-                                    await channel.send(embed=disnake.Embed(
-                                        title="ℹ️ No Player Cards Generated",
-                                        description=f"No tracked players found in this CHERRY match.",
-                                        color=disnake.Color.blue()
-                                    ))
+                                
+                                # Send the match summary first
+                                await channel.send(embed=summary_embed)
+                                
+                                # Send all player cards
+                                for card_file in player_cards:
+                                    await channel.send(file=card_file)
+                                
+                                # Delete the original "CHERRY Match Queued" message after a delay
+                                await asyncio.sleep(5)
+                                await message.delete()
                                 
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)

@@ -215,6 +215,7 @@ class Loops(commands.Cog):
                                     # Handle cases where match data couldn't be fetched
                                     if game_mode_finished == 'CHERRY':
                                         # For CHERRY matches, add to pending queue instead of showing error
+                                        print(f"Queuing CHERRY match {full_game_id} with message ID {message.id} in channel {channel.id}")
                                         await self.bot.get_cog("DatabaseOperations").add_pending_match(
                                             full_game_id, game_mode_finished, channel.id, message.id
                                         )
@@ -224,6 +225,7 @@ class Loops(commands.Cog):
                                             color=disnake.Color.orange()
                                         )
                                         await message.edit(embed=queue_embed)
+                                        print(f"Successfully queued CHERRY match {full_game_id} and updated message {message.id}")
                                         # Don't delete the message - it will be updated when the match is processed
                                         skip_deletion = True
                                     else:
@@ -320,6 +322,7 @@ class Loops(commands.Cog):
                 
                 for match_data in pending_matches:
                     match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt = match_data
+                    print(f"Processing pending match {match_id} (attempt {attempts + 1}) with message ID {message_id} in channel {channel_id}")
                     
                     try:
                         # Try to fetch the match data from the API again
@@ -337,12 +340,27 @@ class Loops(commands.Cog):
                                 channel = await self.bot.fetch_channel(channel_id)
                                 message = await channel.fetch_message(message_id)
                                 
-                                # Update message to show we're processing
-                                await message.edit(embed=disnake.Embed(
-                                    title="🎮 CHERRY Match Found - Processing...",
-                                    description="Match data is now available. Generating player cards...",
-                                    color=disnake.Color.green()
-                                ))
+                                # Validate that this is actually a CHERRY match queued message
+                                # Check if the message has an embed with the expected title
+                                is_valid_queued_message = (
+                                    message.embeds and 
+                                    len(message.embeds) > 0 and 
+                                    message.embeds[0].title and
+                                    "CHERRY Match Queued" in message.embeds[0].title
+                                )
+                                
+                                if not is_valid_queued_message:
+                                    print(f"Warning: Message {message_id} for match {match_id} doesn't appear to be a CHERRY queued message. Skipping deletion.")
+                                    # Still process the match but don't delete the message
+                                    should_delete_message = False
+                                else:
+                                    should_delete_message = True
+                                    # Update message to show we're processing
+                                    await message.edit(embed=disnake.Embed(
+                                        title="🎮 CHERRY Match Found - Processing...",
+                                        description="Match data is now available. Generating player cards...",
+                                        color=disnake.Color.green()
+                                    ))
                                 
                                 game_start_date = match_info[3]
                                 
@@ -375,9 +393,16 @@ class Loops(commands.Cog):
                                 for card_file in player_cards:
                                     await channel.send(file=card_file)
                                 
-                                # Delete the original "CHERRY Match Queued" message after a delay
-                                await asyncio.sleep(5)
-                                await message.delete()
+                                # Only delete the original message if it was validated as a queued message
+                                if should_delete_message:
+                                    try:
+                                        await asyncio.sleep(5)
+                                        await message.delete()
+                                        print(f"Successfully deleted queued message for match {match_id}")
+                                    except disnake.NotFound:
+                                        print(f"Queued message for match {match_id} was already deleted")
+                                    except Exception as e:
+                                        print(f"Error deleting queued message for match {match_id}: {e}")
                                 
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
@@ -400,19 +425,34 @@ class Loops(commands.Cog):
                                     channel = await self.bot.fetch_channel(channel_id)
                                     message = await channel.fetch_message(message_id)
                                     
-                                    failure_embed = disnake.Embed(
-                                        title="❌ CHERRY Match Processing Failed",
-                                        description=f"Match {match_id} could not be processed after multiple attempts.\nThis may be due to API limitations or the match being unavailable.",
-                                        color=disnake.Color.red()
+                                    # Validate that this is actually a CHERRY match queued message
+                                    is_valid_queued_message = (
+                                        message.embeds and 
+                                        len(message.embeds) > 0 and 
+                                        message.embeds[0].title and
+                                        ("CHERRY Match Queued" in message.embeds[0].title or 
+                                         "CHERRY Match Found" in message.embeds[0].title)
                                     )
-                                    await message.edit(embed=failure_embed)
                                     
-                                    # Delete message after a delay
-                                    await asyncio.sleep(10)
-                                    await message.delete()
+                                    if is_valid_queued_message:
+                                        failure_embed = disnake.Embed(
+                                            title="❌ CHERRY Match Processing Failed",
+                                            description=f"Match {match_id} could not be processed after multiple attempts.\nThis may be due to API limitations or the match being unavailable.",
+                                            color=disnake.Color.red()
+                                        )
+                                        await message.edit(embed=failure_embed)
+                                        
+                                        # Delete message after a delay
+                                        await asyncio.sleep(10)
+                                        await message.delete()
+                                        print(f"Deleted failed CHERRY match message for {match_id}")
+                                    else:
+                                        print(f"Warning: Message {message_id} for failed match {match_id} doesn't appear to be a CHERRY queued message. Skipping deletion.")
                                     
                                 except disnake.NotFound:
-                                    pass  # Message already deleted
+                                    print(f"Message for failed match {match_id} was already deleted")
+                                except Exception as e:
+                                    print(f"Error handling failed match message for {match_id}: {e}")
                                 
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
                                 print(f"Removed pending match {match_id} after {attempts + 1} failed attempts")

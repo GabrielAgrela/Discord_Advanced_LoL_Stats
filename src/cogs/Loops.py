@@ -224,7 +224,7 @@ class Loops(commands.Cog):
                                             description=f"Match {full_game_id} has been added to the processing queue.\nCHERRY matches may take longer to become available in the API.",
                                             color=disnake.Color.orange()
                                         )
-                                        await message.edit(embed=queue_embed)
+                                        await message.edit(embed=queue_embed, attachments=[])
                                         print(f"Successfully queued CHERRY match {full_game_id} and updated message {message.id}")
                                         # Don't delete the message - it will be updated when the match is processed
                                         skip_deletion = True
@@ -258,10 +258,7 @@ class Loops(commands.Cog):
                         except Exception as e:
                             print(f"Error processing finished game {game_id}: {e}")
                             await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error processing finished game {game_id}: {e}")
-                        
-                        # Only remove from tracking if we're not keeping the message for queue processing
-                        if not skip_deletion:
-                            games_to_remove.append(game_id)
+                        games_to_remove.append(game_id)
                 
                 for game_id in games_to_remove:
                     self.live_game_messages.pop(game_id)
@@ -389,46 +386,21 @@ class Loops(commands.Cog):
                                 # Generate player cards
                                 player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
                                 
-                                # Send the match summary first
-                                await channel.send(embed=summary_embed)
-                                
+                                # Update the queued message with summary embed and remove previous attachments
+                                await message.edit(embed=summary_embed, attachments=[])
                                 # Send all player cards
                                 for card_file in player_cards:
                                     await channel.send(file=card_file)
                                 
-                                # Only delete the original message if it was validated as a queued message
-                                if should_delete_message:
-                                    try:
-                                        await asyncio.sleep(5)
-                                        await message.delete()
-                                        print(f"Successfully deleted queued message for match {match_id}")
-                                    except disnake.NotFound:
-                                        print(f"Queued message for match {match_id} was already deleted")
-                                    except Exception as e:
-                                        print(f"Error deleting queued message for match {match_id}: {e}")
-                                
+                                # Deletion of queued message removed so updated summary remains
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
-                                
-                                # Remove from live game messages tracking since the match is now processed
-                                # Extract the actual game_id without region prefix for tracking lookup
-                                game_id_for_tracking = match_id.split('_', 1)[1] if '_' in match_id else match_id
-                                if game_id_for_tracking in self.live_game_messages:
-                                    self.live_game_messages.pop(game_id_for_tracking)
-                                    print(f"Removed processed CHERRY match {game_id_for_tracking} from live game tracking")
                                 
                                 print(f"Successfully processed pending CHERRY match: {match_id}")
                                 
                             except disnake.NotFound:
                                 # Message or channel was deleted, remove from queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
-                                
-                                # Remove from live game messages tracking since message no longer exists
-                                game_id_for_tracking = match_id.split('_', 1)[1] if '_' in match_id else match_id
-                                if game_id_for_tracking in self.live_game_messages:
-                                    self.live_game_messages.pop(game_id_for_tracking)
-                                    print(f"Removed orphaned CHERRY match {game_id_for_tracking} from live game tracking")
-                                
                                 print(f"Message/channel not found for pending match {match_id}, removed from queue")
                                 
                         else:
@@ -472,13 +444,6 @@ class Loops(commands.Cog):
                                     print(f"Error handling failed match message for {match_id}: {e}")
                                 
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
-                                
-                                # Remove from live game messages tracking since we're giving up on this match
-                                game_id_for_tracking = match_id.split('_', 1)[1] if '_' in match_id else match_id
-                                if game_id_for_tracking in self.live_game_messages:
-                                    self.live_game_messages.pop(game_id_for_tracking)
-                                    print(f"Removed failed CHERRY match {game_id_for_tracking} from live game tracking")
-                                
                                 print(f"Removed pending match {match_id} after {attempts + 1} failed attempts")
                     
                     except Exception as e:

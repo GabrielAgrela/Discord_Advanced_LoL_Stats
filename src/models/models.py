@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 @dataclass
 class Match:
@@ -11,6 +11,17 @@ class Match:
     game_type: str
     game_creation: str
     game_end: str
+    # Additional InfoDto fields
+    data_version: Optional[str] = None
+    end_of_game_result: Optional[str] = None
+    game_id: Optional[int] = None
+    game_name: Optional[str] = None
+    game_start_timestamp: Optional[int] = None
+    game_end_timestamp: Optional[int] = None
+    map_id: Optional[int] = None
+    platform_id: Optional[str] = None
+    queue_id: Optional[int] = None
+    tournament_code: Optional[str] = None
 
 @dataclass
 class Participant:
@@ -140,6 +151,245 @@ class Participant:
     riot_id_game_name: str
     riot_id_tagline: str
     profile_icon: int
+    # Missing ParticipantDto fields
+    baron_kills: int = 0
+    dragon_kills: int = 0
+    eligible_for_progression: bool = False
+    magic_damage_dealt: int = 0
+    magic_damage_taken: int = 0
+    physical_damage_dealt: int = 0
+    physical_damage_taken: int = 0
+    true_damage_dealt: int = 0
+    true_damage_taken: int = 0
+    objectives_stolen: int = 0
+    objectives_stolen_assists: int = 0
+    participant_id: int = 0
+    placement: int = 0
+    player_augment1: int = 0
+    player_augment2: int = 0
+    player_augment3: int = 0
+    player_augment4: int = 0
+    player_subteam_id: int = 0
+    subteam_placement: int = 0
+    summoner_id: Optional[str] = None
+    time_ccing_others: int = 0
+    detector_wards_placed: int = 0
+    sight_wards_bought_in_game: int = 0
+    vision_wards_bought_in_game: int = 0
+    # Player scores from MissionsDto
+    player_score0: int = 0
+    player_score1: int = 0
+    player_score2: int = 0
+    player_score3: int = 0
+    player_score4: int = 0
+    player_score5: int = 0
+    player_score6: int = 0
+    player_score7: int = 0
+    player_score8: int = 0
+    player_score9: int = 0
+    player_score10: int = 0
+    player_score11: int = 0
+
+@dataclass
+class Team:
+    match_id: str
+    team_id: int
+    win: bool
+
+@dataclass
+class Ban:
+    id: int
+    match_id: str
+    team_id: int
+    champion_id: int
+    pick_turn: int
+
+@dataclass
+class Objective:
+    id: int
+    match_id: str
+    team_id: int
+    objective_type: str  # baron, dragon, tower, inhibitor, riftHerald, champion, horde
+    first: bool
+    kills: int
+
+@dataclass
+class Challenge:
+    id: int
+    match_id: str
+    participant_id: int
+    # Challenge fields from ChallengesDto
+    assists_streak_count_12: int = 0
+    baron_buff_gold_advantage_over_threshold: int = 0
+    control_ward_time_coverage_in_river_or_enemy_half: float = 0.0
+    earliest_baron: int = 0
+    earliest_dragon_takedown: int = 0
+    earliest_elder_dragon: int = 0
+    early_laning_phase_gold_exp_advantage: int = 0
+    faster_support_quest_completion: int = 0
+    fastest_legendary: int = 0
+    had_afk_teammate: int = 0
+    highest_champion_damage: int = 0
+    highest_crowd_control_score: int = 0
+    highest_ward_kills: int = 0
+    jungler_kills_early_jungle: int = 0
+    kills_on_laners_early_jungle_as_jungler: int = 0
+    laning_phase_gold_exp_advantage: int = 0
+    legendary_count: int = 0
+    max_cs_advantage_on_lane_opponent: float = 0.0
+    max_level_lead_lane_opponent: int = 0
+    most_wards_destroyed_one_sweeper: int = 0
+    mythic_item_used: int = 0
+    played_champ_select_position: int = 0
+    solo_turrets_lategame: int = 0
+    takedowns_first_25_minutes: int = 0
+    teleport_takedowns: int = 0
+    third_inhibitor_destroyed_time: int = 0
+    three_wards_one_sweeper_count: int = 0
+    vision_score_advantage_lane_opponent: float = 0.0
+    infernal_scale_pickup: int = 0
+    fist_bump_participation: int = 0
+    void_monster_kill: int = 0
+    ability_uses: int = 0
+    aces_before_15_minutes: int = 0
+    allied_jungle_monster_kills: float = 0.0
+    baron_takedowns: int = 0
+    blast_cone_opposite_opponent_count: int = 0
+    bounty_gold: int = 0
+    buffs_stolen: int = 0
+    complete_support_quest_in_time: int = 0
+    control_wards_placed: int = 0
+    damage_per_minute: float = 0.0
+    damage_taken_on_team_percentage: float = 0.0
+    danced_with_rift_herald: int = 0
+    deaths_by_enemy_champs: int = 0
+    dodge_skill_shots_small_window: int = 0
+    double_aces: int = 0
+    dragon_takedowns: int = 0
+    effective_heal_and_shielding: float = 0.0
+    elder_dragon_kills_with_opposing_soul: int = 0
+    elder_dragon_multikills: int = 0
+    enemy_champion_immobilizations: int = 0
+    enemy_jungle_monster_kills: float = 0.0
+    epic_monster_kills_near_enemy_jungler: int = 0
+    epic_monster_kills_within_30_seconds_of_spawn: int = 0
+    epic_monster_steals: int = 0
+    epic_monster_stolen_without_smite: int = 0
+    first_turret_killed: int = 0
+    first_turret_killed_time: float = 0.0
+    flawless_aces: int = 0
+    full_team_takedown: int = 0
+    game_length: float = 0.0
+    get_takedowns_in_all_lanes_early_jungle_as_laner: int = 0
+    gold_per_minute: float = 0.0
+    had_open_nexus: int = 0
+    immobilize_and_kill_with_ally: int = 0
+    initial_buff_count: int = 0
+    initial_crab_count: int = 0
+    jungle_cs_before_10_minutes: float = 0.0
+    jungler_takedowns_near_damaged_epic_monster: int = 0
+    kda: float = 0.0
+    kill_after_hidden_with_ally: int = 0
+    killed_champ_took_full_team_damage_survived: int = 0
+    killing_sprees: int = 0
+    kill_participation: float = 0.0
+    kills_near_enemy_turret: int = 0
+    kills_on_other_lanes_early_jungle_as_laner: int = 0
+    kills_on_recently_healed_by_aram_pack: int = 0
+    kills_under_own_turret: int = 0
+    kills_with_help_from_epic_monster: int = 0
+    knock_enemy_into_team_and_kill: int = 0
+    k_turrets_destroyed_before_plates_fall: int = 0
+    land_skill_shots_early_game: int = 0
+    lane_minions_first_10_minutes: int = 0
+    lost_an_inhibitor: int = 0
+    max_kill_deficit: int = 0
+    mejais_full_stack_in_time: int = 0
+    more_enemy_jungle_than_opponent: float = 0.0
+    multi_kill_one_spell: int = 0
+    multikills: int = 0
+    multikills_after_aggressive_flash: int = 0
+    multi_turret_rift_herald_count: int = 0
+    outer_turret_executes_before_10_minutes: int = 0
+    outnumbered_kills: int = 0
+    outnumbered_nexus_kill: int = 0
+    perfect_dragon_souls_taken: int = 0
+    perfect_game: int = 0
+    pick_kill_with_ally: int = 0
+    poro_explosions: int = 0
+    quick_cleanse: int = 0
+    quick_first_turret: int = 0
+    quick_solo_kills: int = 0
+    rift_herald_takedowns: int = 0
+    save_ally_from_death: int = 0
+    scuttle_crab_kills: int = 0
+    shortest_time_to_ace_from_first_takedown: float = 0.0
+    skillshots_dodged: int = 0
+    skillshots_hit: int = 0
+    snowballs_hit: int = 0
+    solo_baron_kills: int = 0
+    swarm_defeat_aatrox: int = 0
+    swarm_defeat_briar: int = 0
+    swarm_defeat_mini_bosses: int = 0
+    swarm_evolve_weapon: int = 0
+    swarm_have_3_passives: int = 0
+    swarm_kill_enemy: int = 0
+    swarm_pickup_gold: float = 0.0
+    swarm_reach_level_50: int = 0
+    swarm_survive_15_min: int = 0
+    swarm_win_with_5_evolved_weapons: int = 0
+    solo_kills: int = 0
+    stealth_wards_placed: int = 0
+    survived_single_digit_hp_count: int = 0
+    survived_three_immobilizes_in_fight: int = 0
+    takedown_on_first_turret: int = 0
+    takedowns: int = 0
+    takedowns_after_gaining_level_advantage: int = 0
+    takedowns_before_jungle_minion_spawn: int = 0
+    takedowns_first_x_minutes: int = 0
+    takedowns_in_alcove: int = 0
+    takedowns_in_enemy_fountain: int = 0
+    team_baron_kills: int = 0
+    team_damage_percentage: float = 0.0
+    team_elder_dragon_kills: int = 0
+    team_rift_herald_kills: int = 0
+    took_large_damage_survived: int = 0
+    turret_plates_taken: int = 0
+    turrets_taken_with_rift_herald: int = 0
+    turret_takedowns: int = 0
+    twenty_minions_in_3_seconds_count: int = 0
+    two_wards_one_sweeper_count: int = 0
+    unseen_recalls: int = 0
+    vision_score_per_minute: float = 0.0
+    wards_guarded: int = 0
+    ward_takedowns: int = 0
+    ward_takedowns_before_20m: int = 0
+    legendary_item_used: Optional[str] = None  # Comma-separated list
+
+@dataclass
+class Perk:
+    id: int
+    match_id: str
+    participant_id: int
+    stat_defense: int
+    stat_flex: int
+    stat_offense: int
+
+@dataclass
+class PerkStyle:
+    id: int
+    perk_id: int
+    description: str
+    style: int
+
+@dataclass
+class PerkSelection:
+    id: int
+    perk_style_id: int
+    perk: int
+    var1: int
+    var2: int
+    var3: int
 
 @dataclass
 class User:

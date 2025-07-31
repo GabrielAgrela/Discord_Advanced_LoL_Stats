@@ -270,7 +270,7 @@ class RiotAPIOperations(commands.Cog):
                             total_matches_updated += 1
                         
             except Exception as e:
-                print(f"Error processing {riot_id}: {str(e)}")
+                print(f"Error 2 processing {riot_id}: {str(e)}")
                 await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error processing {riot_id}: {str(e)}")
                 continue
         

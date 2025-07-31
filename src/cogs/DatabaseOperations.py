@@ -403,194 +403,326 @@ class DatabaseOperations(commands.Cog):
         return None
 
     async def insert_match(self, match_data):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Insert match data
         match_id = match_data['metadata']['matchId']
         info = match_data['info']
+        metadata = match_data['metadata']
         
-        cursor.execute('''
-        INSERT OR IGNORE INTO matches (
-            match_id, game_duration, game_version, 
-            game_mode, game_type, game_creation, game_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            match_id,
-            info['gameDuration'],
-            info['gameVersion'],
-            info['gameMode'],
-            info['gameType'],
-            datetime.fromtimestamp(info['gameCreation']/1000),
-            datetime.fromtimestamp(info['gameEndTimestamp']/1000)
-        ))
-
-        # Insert participant data
-        for participant in info['participants']:
-            # Helper function to safely get values with defaults
-            def get_safe(key, default=0):
-                return participant.get(key, default)
+        print(f"🔄 Processing match: {match_id}")
+        print(f"📊 Match has {len(info.get('participants', []))} participants")
+        
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            cursor = conn.cursor()
             
-            # Helper function to safely get nested challenge values
-            def get_challenge(key, default=0):
-                return participant.get('challenges', {}).get(key, default)
-
+            # Enable WAL mode for better concurrency
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA mmap_size=268435456")  # 256 MB
+            
             cursor.execute('''
-            INSERT OR IGNORE INTO participants (
-                match_id, puuid, summoner_name, champion_name, champion_id,
-                team_id, team_position, individual_position, lane, role,
-                wins, kills, deaths, assists, kda, kill_participation,
-                champion_level, vision_score, total_damage_dealt,
-                total_damage_to_champions, physical_damage_to_champions,
-                magic_damage_to_champions, true_damage_to_champions,
-                total_damage_taken, gold_earned, gold_spent,
-                total_minions_killed, vision_wards_bought,
-                sight_wards_bought, wards_placed, wards_killed,
-                champion_experience, time_played, total_time_spent_dead,
-                item0, item1, item2, item3, item4, item5, item6,
-                bounty_level, killing_sprees, largest_killing_spree,
-                largest_multi_kill, longest_time_spent_living, double_kills,
-                triple_kills, quadra_kills, penta_kills, unreal_kills,
-                damage_dealt_to_buildings, damage_dealt_to_objectives,
-                damage_dealt_to_turrets, damage_self_mitigated,
-                largest_critical_strike, inhibitor_kills, inhibitor_takedowns,
-                inhibitors_lost, nexus_kills, nexus_lost, nexus_takedowns,
-                turret_kills, turret_takedowns, turrets_lost, champion_transform,
-                consumables_purchased, items_purchased, neutral_minions_killed,
-                total_ally_jungle_minions_killed, total_enemy_jungle_minions_killed,
-                total_time_cc_dealt, total_units_healed, first_blood_assist,
-                first_blood_kill, first_tower_assist, first_tower_kill,
-                game_ended_in_surrender, game_ended_in_early_surrender,
-                team_early_surrendered, spell1_casts, spell2_casts, spell3_casts,
-                spell4_casts, summoner1_casts, summoner2_casts, summoner1_id,
-                summoner2_id, total_heal, total_heals_on_teammates,
-                total_damage_shielded_on_teammates, all_in_pings, assist_me_pings,
-                basic_pings, command_pings, danger_pings, enemy_missing_pings,
-                enemy_vision_pings, get_back_pings, hold_pings, need_vision_pings,
-                on_my_way_pings, push_pings, retreat_pings, vision_cleared_pings,
-                summoner_level, riot_id_game_name, riot_id_tagline, profile_icon
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
+            INSERT OR IGNORE INTO matches (
+                match_id, game_duration, game_version, game_mode, game_type, 
+                game_creation, game_end, data_version, end_of_game_result,
+                game_id, game_name, game_start_timestamp, game_end_timestamp,
+                map_id, platform_id, queue_id, tournament_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 match_id,
-                get_safe('puuid'),
-                get_safe('summonerName'),
-                get_safe('championName'),
-                get_safe('championId'),
-                get_safe('teamId'),
-                get_safe('teamPosition'),
-                get_safe('individualPosition'),
-                get_safe('lane'),
-                get_safe('role'),
-                get_safe('win'),
-                get_safe('kills'),
-                get_safe('deaths'),
-                get_safe('assists'),
-                get_challenge('kda'),
-                get_challenge('killParticipation'),
-                get_safe('champLevel'),
-                get_safe('visionScore'),
-                get_safe('totalDamageDealt'),
-                get_safe('totalDamageDealtToChampions'),
-                get_safe('physicalDamageDealtToChampions'),
-                get_safe('magicDamageDealtToChampions'),
-                get_safe('trueDamageDealtToChampions'),
-                get_safe('totalDamageTaken'),
-                get_safe('goldEarned'),
-                get_safe('goldSpent'),
-                get_safe('totalMinionsKilled'),
-                get_safe('visionWardsBoughtInGame'),
-                get_safe('sightWardsBoughtInGame'),
-                get_safe('wardsPlaced'),
-                get_safe('wardsKilled'),
-                get_safe('champExperience'),
-                get_safe('timePlayed'),
-                get_safe('totalTimeSpentDead'),
-                get_safe('item0'),
-                get_safe('item1'),
-                get_safe('item2'),
-                get_safe('item3'),
-                get_safe('item4'),
-                get_safe('item5'),
-                get_safe('item6'),
-                get_safe('bountyLevel'),
-                get_safe('killingSprees'),
-                get_safe('largestKillingSpree'),
-                get_safe('largestMultiKill'),
-                get_safe('longestTimeSpentLiving'),
-                get_safe('doubleKills'),
-                get_safe('tripleKills'),
-                get_safe('quadraKills'),
-                get_safe('pentaKills'),
-                get_safe('unrealKills'),
-                get_safe('damageDealtToBuildings'),
-                get_safe('damageDealtToObjectives'),
-                get_safe('damageDealtToTurrets'),
-                get_safe('damageSelfMitigated'),
-                get_safe('largestCriticalStrike'),
-                get_safe('inhibitorKills'),
-                get_safe('inhibitorTakedowns'),
-                get_safe('inhibitorsLost'),
-                get_safe('nexusKills'),
-                get_safe('nexusLost'),
-                get_safe('nexusTakedowns'),
-                get_safe('turretKills'),
-                get_safe('turretTakedowns'),
-                get_safe('turretsLost'),
-                get_safe('championTransform'),
-                get_safe('consumablesPurchased'),
-                get_safe('itemsPurchased'),
-                get_safe('neutralMinionsKilled'),
-                get_safe('totalAllyJungleMinionsKilled'),
-                get_safe('totalEnemyJungleMinionsKilled'),
-                get_safe('totalTimeCCDealt'),
-                get_safe('totalUnitsHealed'),
-                get_safe('firstBloodAssist'),
-                get_safe('firstBloodKill'),
-                get_safe('firstTowerAssist'),
-                get_safe('firstTowerKill'),
-                get_safe('gameEndedInSurrender'),
-                get_safe('gameEndedInEarlySurrender'),
-                get_safe('teamEarlySurrendered'),
-                get_safe('spell1Casts'),
-                get_safe('spell2Casts'),
-                get_safe('spell3Casts'),
-                get_safe('spell4Casts'),
-                get_safe('summoner1Casts'),
-                get_safe('summoner2Casts'),
-                get_safe('summoner1Id'),
-                get_safe('summoner2Id'),
-                get_safe('totalHeal'),
-                get_safe('totalHealsOnTeammates'),
-                get_safe('totalDamageShieldedOnTeammates'),
-                get_safe('allInPings'),
-                get_safe('assistMePings'),
-                get_safe('basicPings'),
-                get_safe('commandPings'),
-                get_safe('dangerPings'),
-                get_safe('enemyMissingPings'),
-                get_safe('enemyVisionPings'),
-                get_safe('getBackPings'),
-                get_safe('holdPings'),
-                get_safe('needVisionPings'),
-                get_safe('onMyWayPings'),
-                get_safe('pushPings'),
-                get_safe('retreatPings'),
-                get_safe('visionClearedPings'),
-                get_safe('summonerLevel'),
-                get_safe('riotIdGameName'),
-                get_safe('riotIdTagline'),
-                get_safe('profileIcon')
+                info.get('gameDuration', 0),
+                info.get('gameVersion', ''),
+                info.get('gameMode', ''),
+                info.get('gameType', ''),
+                datetime.fromtimestamp(info.get('gameCreation', 0)/1000) if info.get('gameCreation') else None,
+                datetime.fromtimestamp(info.get('gameEndTimestamp', 0)/1000) if info.get('gameEndTimestamp') else None,
+                metadata.get('dataVersion', ''),
+                info.get('endOfGameResult', ''),
+                info.get('gameId', 0),
+                info.get('gameName', ''),
+                info.get('gameStartTimestamp', 0),
+                info.get('gameEndTimestamp', 0),
+                info.get('mapId', 0),
+                info.get('platformId', ''),
+                info.get('queueId', 0),
+                info.get('tournamentCode', '')
             ))
 
-        conn.commit()
-        conn.close()
+            # Insert team data
+            for team in info.get('teams', []):
+                cursor.execute('''
+                INSERT OR IGNORE INTO teams (match_id, team_id, win) 
+                VALUES (?, ?, ?)
+                ''', (match_id, team.get('teamId', 0), team.get('win', False)))
+                
+                # Insert bans for this team
+                for ban in team.get('bans', []):
+                    cursor.execute('''
+                    INSERT OR IGNORE INTO bans (match_id, team_id, champion_id, pick_turn)
+                    VALUES (?, ?, ?, ?)
+                    ''', (match_id, team.get('teamId', 0), ban.get('championId', 0), ban.get('pickTurn', 0)))
+                
+                # Insert objectives for this team
+                objectives = team.get('objectives', {})
+                for obj_type, obj_data in objectives.items():
+                    if isinstance(obj_data, dict):
+                        cursor.execute('''
+                        INSERT OR IGNORE INTO objectives (match_id, team_id, objective_type, first, kills)
+                        VALUES (?, ?, ?, ?, ?)
+                        ''', (match_id, team.get('teamId', 0), obj_type, 
+                              obj_data.get('first', False), obj_data.get('kills', 0)))
+
+            # Insert participant data with all new fields
+            for participant in info.get('participants', []):
+                # Helper function to safely get values with defaults
+                def get_safe(key, default=0):
+                    return participant.get(key, default)
+                
+                # Helper function to safely get nested challenge values
+                def get_challenge(key, default=0):
+                    return participant.get('challenges', {}).get(key, default)
+                
+                # Helper function to get missions data
+                def get_mission(key, default=0):
+                    return participant.get('missions', {}).get(key, default)
+
+                cursor.execute('''
+                INSERT OR IGNORE INTO participants (
+                    match_id, puuid, summoner_name, champion_name, champion_id,
+                    team_id, team_position, individual_position, lane, role,
+                    wins, kills, deaths, assists, kda, kill_participation,
+                    champion_level, vision_score, total_damage_dealt,
+                    total_damage_to_champions, physical_damage_to_champions,
+                    magic_damage_to_champions, true_damage_to_champions,
+                    total_damage_taken, gold_earned, gold_spent,
+                    total_minions_killed, vision_wards_bought,
+                    sight_wards_bought, wards_placed, wards_killed,
+                    champion_experience, time_played, total_time_spent_dead,
+                    item0, item1, item2, item3, item4, item5, item6,
+                    bounty_level, killing_sprees, largest_killing_spree,
+                    largest_multi_kill, longest_time_spent_living, double_kills,
+                    triple_kills, quadra_kills, penta_kills, unreal_kills,
+                    damage_dealt_to_buildings, damage_dealt_to_objectives,
+                    damage_dealt_to_turrets, damage_self_mitigated,
+                    largest_critical_strike, inhibitor_kills, inhibitor_takedowns,
+                    inhibitors_lost, nexus_kills, nexus_lost, nexus_takedowns,
+                    turret_kills, turret_takedowns, turrets_lost, champion_transform,
+                    consumables_purchased, items_purchased, neutral_minions_killed,
+                    total_ally_jungle_minions_killed, total_enemy_jungle_minions_killed,
+                    total_time_cc_dealt, total_units_healed, first_blood_assist,
+                    first_blood_kill, first_tower_assist, first_tower_kill,
+                    game_ended_in_surrender, game_ended_in_early_surrender,
+                    team_early_surrendered, spell1_casts, spell2_casts, spell3_casts,
+                    spell4_casts, summoner1_casts, summoner2_casts, summoner1_id,
+                    summoner2_id, total_heal, total_heals_on_teammates,
+                    total_damage_shielded_on_teammates, all_in_pings, assist_me_pings,
+                    basic_pings, command_pings, danger_pings, enemy_missing_pings,
+                    enemy_vision_pings, get_back_pings, hold_pings, need_vision_pings,
+                    on_my_way_pings, push_pings, retreat_pings, vision_cleared_pings,
+                    summoner_level, riot_id_game_name, riot_id_tagline, profile_icon,
+                    baron_kills, dragon_kills, eligible_for_progression,
+                    magic_damage_dealt, magic_damage_taken, physical_damage_dealt,
+                    physical_damage_taken, true_damage_dealt, true_damage_taken,
+                    objectives_stolen, objectives_stolen_assists, participant_id,
+                    placement, player_augment1, player_augment2, player_augment3,
+                    player_augment4, player_subteam_id, subteam_placement,
+                    summoner_id, time_ccing_others, detector_wards_placed,
+                    sight_wards_bought_in_game, vision_wards_bought_in_game,
+                    player_score0, player_score1, player_score2, player_score3,
+                    player_score4, player_score5, player_score6, player_score7,
+                    player_score8, player_score9, player_score10, player_score11
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?
+                )
+                ''', (
+                    match_id,
+                    get_safe('puuid'),
+                    get_safe('summonerName'),
+                    get_safe('championName'),
+                    get_safe('championId'),
+                    get_safe('teamId'),
+                    get_safe('teamPosition'),
+                    get_safe('individualPosition'),
+                    get_safe('lane'),
+                    get_safe('role'),
+                    get_safe('win'),
+                    get_safe('kills'),
+                    get_safe('deaths'),
+                    get_safe('assists'),
+                    get_challenge('kda') or (get_safe('kills') + get_safe('assists')) / max(get_safe('deaths'), 1),
+                    get_challenge('killParticipation'),
+                    get_safe('champLevel'),
+                    get_safe('visionScore'),
+                    get_safe('totalDamageDealt'),
+                    get_safe('totalDamageDealtToChampions'),
+                    get_safe('physicalDamageDealtToChampions'),
+                    get_safe('magicDamageDealtToChampions'),
+                    get_safe('trueDamageDealtToChampions'),
+                    get_safe('totalDamageTaken'),
+                    get_safe('goldEarned'),
+                    get_safe('goldSpent'),
+                    get_safe('totalMinionsKilled'),
+                    get_safe('visionWardsBoughtInGame'),
+                    get_safe('sightWardsBoughtInGame'),
+                    get_safe('wardsPlaced'),
+                    get_safe('wardsKilled'),
+                    get_safe('champExperience'),
+                    get_safe('timePlayed'),
+                    get_safe('totalTimeSpentDead'),
+                    get_safe('item0'),
+                    get_safe('item1'),
+                    get_safe('item2'),
+                    get_safe('item3'),
+                    get_safe('item4'),
+                    get_safe('item5'),
+                    get_safe('item6'),
+                    get_safe('bountyLevel'),
+                    get_safe('killingSprees'),
+                    get_safe('largestKillingSpree'),
+                    get_safe('largestMultiKill'),
+                    get_safe('longestTimeSpentLiving'),
+                    get_safe('doubleKills'),
+                    get_safe('tripleKills'),
+                    get_safe('quadraKills'),
+                    get_safe('pentaKills'),
+                    get_safe('unrealKills'),
+                    get_safe('damageDealtToBuildings'),
+                    get_safe('damageDealtToObjectives'),
+                    get_safe('damageDealtToTurrets'),
+                    get_safe('damageSelfMitigated'),
+                    get_safe('largestCriticalStrike'),
+                    get_safe('inhibitorKills'),
+                    get_safe('inhibitorTakedowns'),
+                    get_safe('inhibitorsLost'),
+                    get_safe('nexusKills'),
+                    get_safe('nexusLost'),
+                    get_safe('nexusTakedowns'),
+                    get_safe('turretKills'),
+                    get_safe('turretTakedowns'),
+                    get_safe('turretsLost'),
+                    get_safe('championTransform'),
+                    get_safe('consumablesPurchased'),
+                    get_safe('itemsPurchased'),
+                    get_safe('neutralMinionsKilled'),
+                    get_safe('totalAllyJungleMinionsKilled'),
+                    get_safe('totalEnemyJungleMinionsKilled'),
+                    get_safe('totalTimeCCDealt'),
+                    get_safe('totalUnitsHealed'),
+                    get_safe('firstBloodAssist'),
+                    get_safe('firstBloodKill'),
+                    get_safe('firstTowerAssist'),
+                    get_safe('firstTowerKill'),
+                    get_safe('gameEndedInSurrender'),
+                    get_safe('gameEndedInEarlySurrender'),
+                    get_safe('teamEarlySurrendered'),
+                    get_safe('spell1Casts'),
+                    get_safe('spell2Casts'),
+                    get_safe('spell3Casts'),
+                    get_safe('spell4Casts'),
+                    get_safe('summoner1Casts'),
+                    get_safe('summoner2Casts'),
+                    get_safe('summoner1Id'),
+                    get_safe('summoner2Id'),
+                    get_safe('totalHeal'),
+                    get_safe('totalHealsOnTeammates'),
+                    get_safe('totalDamageShieldedOnTeammates'),
+                    get_safe('allInPings'),
+                    get_safe('assistMePings'),
+                    get_safe('basicPings'),
+                    get_safe('commandPings'),
+                    get_safe('dangerPings'),
+                    get_safe('enemyMissingPings'),
+                    get_safe('enemyVisionPings'),
+                    get_safe('getBackPings'),
+                    get_safe('holdPings'),
+                    get_safe('needVisionPings'),
+                    get_safe('onMyWayPings'),
+                    get_safe('pushPings'),
+                    get_safe('retreatPings'),
+                    get_safe('visionClearedPings'),
+                    get_safe('summonerLevel'),
+                    get_safe('riotIdGameName'),
+                    get_safe('riotIdTagline'),
+                    get_safe('profileIcon'),
+                    # New fields
+                    get_safe('baronKills'),
+                    get_safe('dragonKills'),
+                    get_safe('eligibleForProgression'),
+                    get_safe('magicDamageDealt'),
+                    get_safe('magicDamageTaken'),
+                    get_safe('physicalDamageDealt'),
+                    get_safe('physicalDamageTaken'),
+                    get_safe('trueDamageDealt'),
+                    get_safe('trueDamageTaken'),
+                    get_safe('objectivesStolen'),
+                    get_safe('objectivesStolenAssists'),
+                    get_safe('participantId'),
+                    get_safe('placement'),
+                    get_safe('playerAugment1'),
+                    get_safe('playerAugment2'),
+                    get_safe('playerAugment3'),
+                    get_safe('playerAugment4'),
+                    get_safe('playerSubteamId'),
+                    get_safe('subteamPlacement'),
+                    get_safe('summonerId'),
+                    get_safe('timeCCingOthers'),
+                    get_safe('detectorWardsPlaced'),
+                    get_safe('sightWardsBoughtInGame'),
+                    get_safe('visionWardsBoughtInGame'),
+                    # Mission scores
+                    get_mission('playerScore0'),
+                    get_mission('playerScore1'),
+                    get_mission('playerScore2'),
+                    get_mission('playerScore3'),
+                    get_mission('playerScore4'),
+                    get_mission('playerScore5'),
+                    get_mission('playerScore6'),
+                    get_mission('playerScore7'),
+                    get_mission('playerScore8'),
+                    get_mission('playerScore9'),
+                    get_mission('playerScore10'),
+                    get_mission('playerScore11')
+                ))
+                
+                # Insert challenges data if available (simplified for now)
+                challenges = participant.get('challenges', {})
+                if challenges:
+                    print(f"📈 Found {len(challenges)} challenges for participant {get_safe('participantId')}")
+                
+                # Insert perks data if available (simplified for now)  
+                perks = participant.get('perks', {})
+                if perks:
+                    print(f"🔮 Found perks data for participant {get_safe('participantId')}")
+
+            conn.commit()
+            print(f"✅ Successfully inserted match: {match_id}")
+            
+        except sqlite3.OperationalError as e:
+            print(f"❌ Database operational error for match {match_id}: {e}")
+            if conn:
+                conn.rollback()
+            raise e
+        except sqlite3.Error as e:
+            print(f"❌ Database error for match {match_id}: {e}")
+            if conn:
+                conn.rollback()
+            raise e
+        except Exception as e:
+            print(f"❌ Unexpected error for match {match_id}: {e}")
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if conn:
+                conn.close()
+                print(f"🔐 Database connection closed for match: {match_id}")
 
     async def insert_user(self, username, puuid, riot_id_game_name, riot_id_tagline, inter, active = "TRUE"):
         conn = sqlite3.connect(self.db_path)
@@ -784,7 +916,7 @@ class DatabaseOperations(commands.Cog):
                 p.puuid, p.summoner_level, p.kda, p.kill_participation,
                 p.total_damage_dealt, p.damage_self_mitigated,
                 p.total_heal, p.total_heals_on_teammates,
-                p.total_damage_shielded_on_teammates
+                p.total_damage_shielded_on_teammates, p.placement
             FROM participants p
             WHERE p.match_id = ?
             ORDER BY p.team_id, p.total_damage_to_champions DESC

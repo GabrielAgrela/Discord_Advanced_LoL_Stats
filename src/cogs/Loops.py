@@ -224,7 +224,7 @@ class Loops(commands.Cog):
                                             description=f"Match {full_game_id} has been added to the processing queue.\nCHERRY matches may take longer to become available in the API.",
                                             color=disnake.Color.orange()
                                         )
-                                        await message.edit(embed=queue_embed, attachments=[])
+                                        await message.edit(embed=queue_embed)
                                         print(f"Successfully queued CHERRY match {full_game_id} and updated message {message.id}")
                                         # Don't delete the message - it will be updated when the match is processed
                                         skip_deletion = True
@@ -386,13 +386,11 @@ class Loops(commands.Cog):
                                 # Generate player cards
                                 player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
                                 
-                                # Update the queued message with summary embed and remove previous attachments
-                                await message.edit(embed=summary_embed, attachments=[])
-                                # Send all player cards
+                                # Update the queued message embed to show match summary without using the attachments parameter
+                                await message.edit(embed=summary_embed)
                                 for card_file in player_cards:
                                     await channel.send(file=card_file)
                                 
-                                # Deletion of queued message removed so updated summary remains
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
                                 

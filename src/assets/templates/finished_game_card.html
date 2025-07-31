@@ -156,6 +156,7 @@
         .player-info-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             width: 100%;
         }
         .champion-splash {
@@ -192,6 +193,7 @@
             display: flex;
             flex-direction: column;
             flex-wrap: wrap;
+            flex: 1;
         }
         .player-name {
             font-family: 'BeaufortforLOL', sans-serif;
@@ -212,6 +214,121 @@
         }
         .result-defeat {
             color: #e74c3c;
+        }
+        .placement-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 4px;
+            text-shadow: none;
+            font-family: 'BeaufortforLOL', sans-serif;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .placement-1st {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #1a1a1a;
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+            border: 1px solid rgba(255, 237, 78, 0.6);
+        }
+        .placement-2nd {
+            background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+            color: #1a1a1a;
+            box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+            border: 1px solid rgba(232, 232, 232, 0.6);
+        }
+        .placement-3rd {
+            background: linear-gradient(135deg, #cd7f32, #daa520);
+            color: #1a1a1a;
+            box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+            border: 1px solid rgba(218, 165, 32, 0.6);
+        }
+        .placement-other {
+            background: linear-gradient(135deg, #4a90e2, #7bb3f0);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
+            border: 1px solid rgba(123, 179, 240, 0.6);
+        }
+        
+        /* New prominent placement banner */
+        .placement-banner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 80px;
+            height: 80px;
+            border-radius: 15px;
+            position: relative;
+            z-index: 3;
+            font-family: 'BeaufortforLOL', sans-serif;
+            font-weight: bold;
+            text-align: center;
+            margin-left: 15px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            border: 2px solid;
+            transform: rotate(-5deg);
+            transition: transform 0.3s ease;
+        }
+        
+        .placement-banner:hover {
+            transform: rotate(0deg) scale(1.05);
+        }
+        
+        .placement-number {
+            font-size: 28px;
+            line-height: 1;
+            font-weight: 900;
+            margin-bottom: -2px;
+        }
+        
+        .placement-suffix {
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+        
+        .placement-text {
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        
+        /* Color overrides for banner style */
+        .placement-banner.placement-1st {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%);
+            color: #1a1a1a;
+            border-color: #ffed4e;
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5), 
+                        0 0 30px rgba(255, 215, 0, 0.3);
+        }
+        
+        .placement-banner.placement-2nd {
+            background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 50%, #c0c0c0 100%);
+            color: #1a1a1a;
+            border-color: #e8e8e8;
+            box-shadow: 0 6px 20px rgba(192, 192, 192, 0.5),
+                        0 0 30px rgba(192, 192, 192, 0.3);
+        }
+        
+        .placement-banner.placement-3rd {
+            background: linear-gradient(135deg, #cd7f32 0%, #daa520 50%, #cd7f32 100%);
+            color: #1a1a1a;
+            border-color: #daa520;
+            box-shadow: 0 6px 20px rgba(205, 127, 50, 0.5),
+                        0 0 30px rgba(205, 127, 50, 0.3);
+        }
+        
+        .placement-banner.placement-other {
+            background: linear-gradient(135deg, #4a90e2 0%, #7bb3f0 50%, #4a90e2 100%);
+            color: #ffffff;
+            border-color: #7bb3f0;
+            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.5),
+                        0 0 30px rgba(74, 144, 226, 0.3);
         }
         .tracked-players {
             font-size: 11px;
@@ -492,6 +609,13 @@
                                     </div>
                                     {% endif %}
                                 </div>
+                                {% if player.placement and player.placement > 0 %}
+                                <div class="placement-banner {% if player.placement == 1 %}placement-1st{% elif player.placement == 2 %}placement-2nd{% elif player.placement == 3 %}placement-3rd{% else %}placement-other{% endif %}">
+                                    <div class="placement-number">{{ player.placement }}</div>
+                                    <div class="placement-suffix">{% if player.placement == 1 %}ST{% elif player.placement == 2 %}ND{% elif player.placement == 3 %}RD{% else %}TH{% endif %}</div>
+                                    <div class="placement-text">PLACE</div>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

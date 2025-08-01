@@ -144,9 +144,44 @@ class Loops(commands.Cog):
                             # Update the message to show we're now generating cards
                             await message.edit(embed=disnake.Embed(
                                 title="🎮 Game Over - Generating Stats...",
-                                description=description_for_next_step,
+                                description=f"{description_for_next_step}\n\nResults will be posted in the thread attached to this message.",
                                 color=disnake.Color.gold()
                             ))
+                            
+                            # Create or get a thread attached to this live game message and post results there
+                            thread = None
+                            target_channel = channel
+                            try:
+                                if hasattr(message, "thread") and message.thread and not message.thread.archived:
+                                    thread = message.thread
+                                else:
+                                    thread_name = f"Match {game_id}"
+                                    thread = await message.create_thread(name=thread_name, auto_archive_duration=1440)
+                                target_channel = thread
+                                # Try to remove the system "started a thread" message
+                                try:
+                                    await asyncio.sleep(5)
+                                    async for recent_msg in channel.history(limit=20):
+                                        if (
+                                            recent_msg.type == disnake.MessageType.thread_created and (
+                                                (recent_msg.thread and recent_msg.thread.id == thread.id) or
+                                                (thread.name and thread.name in (recent_msg.content or ""))
+                                            )
+                                        ) or (
+                                            (recent_msg.author and self.bot.user and recent_msg.author.id == self.bot.user.id) and
+                                            ("started a thread" in (recent_msg.content or "")) and
+                                            (thread.name and thread.name in (recent_msg.content or ""))
+                                        ):
+                                            try:
+                                                await recent_msg.delete()
+                                                await message.edit(embed=None)
+                                            except Exception as de:
+                                                print(f"Could not delete system thread message for game {game_id}: {de}")
+                                            break
+                                except Exception as e:
+                                    print(f"Failed to delete system thread message for game {game_id}: {e}")
+                            except Exception as e:
+                                print(f"Error creating or accessing thread for game {game_id}: {e}")
                             
                             # Then generate finished game card
                             try:
@@ -162,21 +197,13 @@ class Loops(commands.Cog):
                                 if match_info and match_participants:
                                     game_start_date = match_info[3] # Used for timestamp
 
-                                    # Common: Prepare participant list for summary
+                                    # Common: Prepare participant list (summary embed removed)
                                     tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
                                     tracked_puuids = {user.puuid for user in tracked_users}
                                     tracked_participants_list = [
                                         f"{p['riot_id_game_name']} ({p['champion_name']})"
                                         for p in match_participants if p['puuid'] in tracked_puuids
                                     ]
-
-                                    # Common: Create base summary embed (title and color will be set per case)
-                                    summary_embed = disnake.Embed()
-                                    summary_embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
-                                    if tracked_participants_list:
-                                        summary_embed.add_field(name="Players", value="\n".join(tracked_participants_list), inline=False)
-                                    else:
-                                        summary_embed.add_field(name="Players", value="No tracked players found in this match", inline=False)
 
                                     if game_mode_finished == "CUSTOM":
                                         await message.edit(embed=disnake.Embed(
@@ -192,25 +219,13 @@ class Loops(commands.Cog):
                                             description="Database update and player card generation skipped for BRAWL games.",
                                             color=disnake.Color.blue() 
                                         ))
-                                        summary_embed.title = "Match Summary: BRAWL"
-                                        summary_embed.color = disnake.Color.blue()
-                                        await channel.send(embed=summary_embed)
                                         # No player cards for BRAWL games.
 
                                     else: # Regular game (not CUSTOM, not BRAWL)
-                                        # For regular games, the original `message` showing "Generating Stats..." remains until deletion.
-                                        
-                                        # Set title and color for regular game summary
-                                        summary_embed.title = f"Match Summary: {match_info[0]}" # Use game_mode from DB for display
-                                        summary_embed.color = disnake.Color.blue()
-                                        
-                                        # Send summary first
-                                        await channel.send(embed=summary_embed)
-                                    
-                                        # Generate and send player cards
+                                        # Generate and send player cards only (no summary embed)
                                         player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(full_game_id)
                                         for card_file in player_cards:
-                                            await channel.send(file=card_file)
+                                            await target_channel.send(file=card_file)
                                 else:
                                     # Handle cases where match data couldn't be fetched
                                     if game_mode_finished == 'CHERRY':
@@ -236,7 +251,7 @@ class Loops(commands.Cog):
                                             color=disnake.Color.red()
                                         )
                                         await message.edit(embed=error_embed)
-                                        await channel.send(embed=error_embed) # Also inform the channel
+                                        await target_channel.send(embed=error_embed) # Also inform the thread/channel
 
                             except Exception as e:
                                 print(f"Error generating finished game card for game {game_id}: {e}")
@@ -249,12 +264,10 @@ class Loops(commands.Cog):
                                     await message.edit(embed=error_embed)
                                 except disnake.NotFound: # If message is already deleted, just send to channel
                                     pass 
-                                await channel.send(embed=error_embed)
+                                await target_channel.send(embed=error_embed)
                             
-                            # Delete the original message after a delay (unless it's a CHERRY match)
-                            if not skip_deletion:
-                                await asyncio.sleep(5)
-                                await message.delete()
+                            # Do not delete the original message; keep it as the parent of the thread with results
+                            # (Previously deleted the message after a short delay.)
                         except Exception as e:
                             print(f"Error processing finished game {game_id}: {e}")
                             await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error processing finished game {game_id}: {e}")
@@ -358,13 +371,12 @@ class Loops(commands.Cog):
                                     # Update message to show we're processing
                                     await message.edit(embed=disnake.Embed(
                                         title="🎮 CHERRY Match Found - Processing...",
-                                        description="Match data is now available. Generating player cards...",
+                                        description="Match data is now available. Generating player cards...\n\nResults will be posted in the thread attached to this message.",
                                         color=disnake.Color.green()
                                     ))
                                 
+                                # Prepare participant list (summary embed removed)
                                 game_start_date = match_info[3]
-                                
-                                # Prepare participant list for summary
                                 tracked_users = await self.bot.get_cog("DatabaseOperations").get_users()
                                 tracked_puuids = {user.puuid for user in tracked_users}
                                 tracked_participants_list = [
@@ -372,24 +384,46 @@ class Loops(commands.Cog):
                                     for p in match_participants if p['puuid'] in tracked_puuids
                                 ]
                                 
-                                # Create summary embed
-                                summary_embed = disnake.Embed()
-                                summary_embed.title = f"Match Summary: {match_info[0]}"
-                                summary_embed.color = disnake.Color.green()
-                                summary_embed.timestamp = datetime.datetime.fromisoformat(game_start_date)
-                                
-                                if tracked_participants_list:
-                                    summary_embed.add_field(name="Players", value="\n".join(tracked_participants_list), inline=False)
-                                else:
-                                    summary_embed.add_field(name="Players", value="No tracked players found in this match", inline=False)
+                                # Create or get a thread for posting results
+                                thread = None
+                                target_channel = channel
+                                try:
+                                    if hasattr(message, "thread") and message.thread and not message.thread.archived:
+                                        thread = message.thread
+                                    else:
+                                        thread_name = f"Match {match_id}"
+                                        thread = await message.create_thread(name=thread_name, auto_archive_duration=1440)
+                                    target_channel = thread
+                                    # Try to remove the system "started a thread" message
+                                    try:
+                                        await asyncio.sleep(0.5)
+                                        async for recent_msg in channel.history(limit=20):
+                                            if (
+                                                recent_msg.type == disnake.MessageType.thread_created and (
+                                                    (recent_msg.thread and recent_msg.thread.id == thread.id) or
+                                                    (thread.name and thread.name in (recent_msg.content or ""))
+                                                )
+                                            ) or (
+                                                (recent_msg.author and self.bot.user and recent_msg.author.id == self.bot.user.id) and
+                                                ("started a thread" in (recent_msg.content or "")) and
+                                                (thread.name and thread.name in (recent_msg.content or ""))
+                                            ):
+                                                try:
+                                                    await recent_msg.delete()
+                                                except Exception as de:
+                                                    print(f"Could not delete system thread message for match {match_id}: {de}")
+                                                break
+                                    except Exception as e:
+                                        print(f"Failed to delete system thread message for match {match_id}: {e}")
+                                except Exception as e:
+                                    print(f"Error creating or accessing thread for match {match_id}: {e}")
                                 
                                 # Generate player cards
                                 player_cards = await self.bot.get_cog("CardGenerator").generate_finished_game_card(match_id)
                                 
-                                # Update the queued message embed to show match summary without using the attachments parameter
-                                await message.edit(embed=summary_embed)
+                                # Update the queued message to no longer include summary; just post the cards in the thread
                                 for card_file in player_cards:
-                                    await channel.send(file=card_file)
+                                    await target_channel.send(file=card_file)
                                 
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)

@@ -76,7 +76,9 @@ class DatabaseOperations(commands.Cog):
                 MAX(CASE 
                     WHEN deaths = 0 THEN kills + assists 
                     ELSE CAST((kills + assists) AS FLOAT) / deaths 
-                END) as max_kda
+                END) as max_kda,
+                ROUND(AVG(CAST(placement AS FLOAT)), 2) as avg_placement,
+                SUM(CASE WHEN placement = 1 THEN 1 ELSE 0 END) as first_place_count
             FROM base_data
             GROUP BY champion_name
             HAVING total_games >= ?
@@ -132,7 +134,9 @@ class DatabaseOperations(commands.Cog):
             (SELECT max_killing_spree_champion FROM overall_stats) as max_killing_spree_champion,
             (SELECT max_kda_champion FROM overall_stats) as max_kda_champion,
             (SELECT latest_summoner_level FROM overall_stats) as summoner_level,
-            (SELECT latest_profile_icon FROM overall_stats) as profile_icon
+            (SELECT latest_profile_icon FROM overall_stats) as profile_icon,
+            avg_placement,
+            first_place_count
         FROM champion_stats
         ORDER BY {sort_column} {sort_order}, champion_games DESC
         LIMIT ?;
@@ -201,7 +205,9 @@ class DatabaseOperations(commands.Cog):
                 max_killing_spree_champion=row[25],
                 max_kda_champion=row[26],
                 summoner_level=latest_info[0] if latest_info else 0,
-                profile_icon=latest_info[1] if latest_info else 0
+                profile_icon=latest_info[1] if latest_info else 0,
+                avg_placement=row[29],
+                first_place_count=row[30]
             ))
         if not player_stats:
             # If no champion stats found, still create an entry with the latest summoner info
@@ -234,7 +240,9 @@ class DatabaseOperations(commands.Cog):
                 max_killing_spree_champion="",
                 max_kda_champion="",
                 summoner_level=latest_info[0] if latest_info else 0,
-                profile_icon=latest_info[1] if latest_info else 0
+                profile_icon=latest_info[1] if latest_info else 0,
+                avg_placement=0.0,
+                first_place_count=0
             ))
         return player_stats
 
@@ -361,6 +369,57 @@ class DatabaseOperations(commands.Cog):
         conn.close()
         return stored_matches
 
+    async def get_player_match_ids(self, riot_id_game_name: str, game_mode: str = None, limit: int = None, start_date: str = None, end_date: str = None) -> List[str]:
+        """
+        Get match IDs for a player by their riot game name.
+        
+        Args:
+            riot_id_game_name: Player's Riot ID game name
+            game_mode: Optional game mode filter (e.g., 'CLASSIC', 'ARAM', 'CHERRY')
+            limit: Optional limit on number of match IDs to return
+            start_date: Optional start date filter (YYYY-MM-DD format)
+            end_date: Optional end date filter (YYYY-MM-DD format)
+            
+        Returns:
+            List of match IDs for the player
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Build the query with optional filters
+        query = '''
+            SELECT DISTINCT p.match_id
+            FROM participants p
+            JOIN matches m ON p.match_id = m.match_id
+            WHERE LOWER(p.riot_id_game_name) = LOWER(?)
+        '''
+        params = [riot_id_game_name]
+        
+        if game_mode:
+            query += ' AND LOWER(m.game_mode) = LOWER(?)'
+            params.append(game_mode)
+            
+        if start_date:
+            query += ' AND DATE(m.game_creation) >= ?'
+            params.append(start_date)
+            
+        if end_date:
+            query += ' AND DATE(m.game_creation) <= ?'
+            params.append(end_date)
+            
+        # Order by game creation date (newest first)
+        query += ' ORDER BY m.game_creation DESC'
+        
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+            
+        cursor.execute(query, params)
+        match_ids = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return match_ids
+
     async def get_match_count(self) -> int:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -393,7 +452,9 @@ class DatabaseOperations(commands.Cog):
         ) for row in results]
 
     async def get_champion(self, id) -> Optional[str]:
-        url = "https://ddragon.leagueoflegends.com/cdn/15.2.1/data/en_US/champion.json"
+        #get version with riotapioperations
+        versions = await self.bot.get_cog("RiotAPIOperations").get_versions()
+        url = f"https://ddragon.leagueoflegends.com/cdn/{versions[0]}/data/en_US/champion.json"
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 data = await response.json()
@@ -422,7 +483,7 @@ class DatabaseOperations(commands.Cog):
             cursor.execute("PRAGMA mmap_size=268435456")  # 256 MB
             
             cursor.execute('''
-            INSERT OR IGNORE INTO matches (
+            INSERT OR REPLACE INTO matches (
                 match_id, game_duration, game_version, game_mode, game_type, 
                 game_creation, game_end, data_version, end_of_game_result,
                 game_id, game_name, game_start_timestamp, game_end_timestamp,
@@ -451,14 +512,14 @@ class DatabaseOperations(commands.Cog):
             # Insert team data
             for team in info.get('teams', []):
                 cursor.execute('''
-                INSERT OR IGNORE INTO teams (match_id, team_id, win) 
+                INSERT OR REPLACE INTO teams (match_id, team_id, win) 
                 VALUES (?, ?, ?)
                 ''', (match_id, team.get('teamId', 0), team.get('win', False)))
                 
                 # Insert bans for this team
                 for ban in team.get('bans', []):
                     cursor.execute('''
-                    INSERT OR IGNORE INTO bans (match_id, team_id, champion_id, pick_turn)
+                    INSERT OR REPLACE INTO bans (match_id, team_id, champion_id, pick_turn)
                     VALUES (?, ?, ?, ?)
                     ''', (match_id, team.get('teamId', 0), ban.get('championId', 0), ban.get('pickTurn', 0)))
                 
@@ -467,7 +528,7 @@ class DatabaseOperations(commands.Cog):
                 for obj_type, obj_data in objectives.items():
                     if isinstance(obj_data, dict):
                         cursor.execute('''
-                        INSERT OR IGNORE INTO objectives (match_id, team_id, objective_type, first, kills)
+                        INSERT OR REPLACE INTO objectives (match_id, team_id, objective_type, first, kills)
                         VALUES (?, ?, ?, ?, ?)
                         ''', (match_id, team.get('teamId', 0), obj_type, 
                               obj_data.get('first', False), obj_data.get('kills', 0)))
@@ -487,7 +548,7 @@ class DatabaseOperations(commands.Cog):
                     return participant.get('missions', {}).get(key, default)
 
                 cursor.execute('''
-                INSERT OR IGNORE INTO participants (
+                INSERT OR REPLACE INTO participants (
                     match_id, puuid, summoner_name, champion_name, champion_id,
                     team_id, team_position, individual_position, lane, role,
                     wins, kills, deaths, assists, kda, kill_participation,
@@ -1216,7 +1277,7 @@ class DatabaseOperations(commands.Cog):
         conn.commit()
         conn.close()
 
-    async def get_pending_matches(self) -> list:
+    async def get_pending_matches(self, if_older_than: int = 0) -> list:
         """Get all pending matches that need to be retried"""
         await self.create_pending_matches_table()  # Ensure table exists
         conn = sqlite3.connect(self.db_path)
@@ -1224,9 +1285,9 @@ class DatabaseOperations(commands.Cog):
         cursor.execute("""
             SELECT match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt
             FROM pending_matches
-            WHERE attempts < 10  -- Maximum 10 attempts
+            WHERE created_at < datetime('now', '-{} minutes')  -- Maximum 10 attempts
             ORDER BY created_at ASC
-        """)
+        """.format(if_older_than))
         results = cursor.fetchall()
         conn.close()
         return results

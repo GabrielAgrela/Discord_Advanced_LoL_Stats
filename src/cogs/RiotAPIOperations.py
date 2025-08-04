@@ -132,7 +132,7 @@ class RiotAPIOperations(commands.Cog):
         data = await self.make_request(url)
         return data
     
-    async def get_match_ids(self, puuid: str, deep_fetch: bool = False) -> List[str]:
+    async def get_match_ids(self, puuid: str, deep_fetch: bool = False, exclude_match_id: str = None) -> List[str]:
         """
         Get match IDs for a player.
         Args:
@@ -159,8 +159,8 @@ class RiotAPIOperations(commands.Cog):
                 break
                 
             all_match_ids.extend(match_ids)
-            # Track new matches that aren't in the database
-            new_matches = [m_id for m_id in match_ids if m_id not in stored_matches]
+            # Track new matches that aren't in the database and aren't the excluded match
+            new_matches = [m_id for m_id in match_ids if m_id not in stored_matches and (exclude_match_id is None or m_id != exclude_match_id)]
             new_match_ids.extend(new_matches)
                         
             if len(new_match_ids) == 0:
@@ -190,7 +190,7 @@ class RiotAPIOperations(commands.Cog):
             return match_data
         return None
     
-    async def update_database(self, inter: disnake.ApplicationCommandInteraction = None, announce: bool = False) -> int:
+    async def update_database(self, inter: disnake.ApplicationCommandInteraction = None, announce: bool = False, exclude_match_id: str = None) -> int:
         users: List[User] = await self.bot.get_cog("DatabaseOperations").get_users(active="TRUE")
         total_matches_updated = 0
         total_users = len(users)
@@ -263,7 +263,7 @@ class RiotAPIOperations(commands.Cog):
                                 description=current_description,
                                 color=disnake.Color.blue()
                             ))
-                    
+
                     for m_id in match_ids:
                         match_data = await self.get_match_data(m_id)
                         if match_data:

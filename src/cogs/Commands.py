@@ -281,8 +281,8 @@ class Commands(commands.Cog):
             description="Minimum number of games required per champion"
         ),
         year: str = commands.Param(
-            choices=["2023", "2024", "2025"],
-            default="2025",
+            choices=["2023", "2024", "2025", "ALL"],
+            default="ALL",
             description="Year to show stats for"
         )
     ):
@@ -301,6 +301,8 @@ class Commands(commands.Cog):
         gamemode = translate(gamemode)
 
         try:
+            if year == "ALL":
+                year = None
             # Get player stats
             data: List[PlayerStats] = await self.bot.get_cog("DatabaseOperations").get_player_stats(
                 summoner_name, 

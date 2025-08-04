@@ -345,11 +345,13 @@ class CardGenerator(commands.Cog):
                     player['kda'] = f"{stats.average_kda:.2f}"
                     # For Cherry/Arena modes, show first place count instead of pentas
                     if gamemode in ['CHERRY', 'ARENA']:
-                        player['pentas'] = getattr(stats, 'first_place_count', 0)
-                        player['pentas_label'] = '1st Place'
+                        player['pentas'] = stats.first_place_count
+                        player['pentas_label'] = '1st Places'
+                        player['avg_placement'] = f"{stats.avg_placement:.2f}"
                     else:
                         player['pentas'] = stats.total_pentas
                         player['pentas_label'] = 'Pentas'
+                        player['avg_placement'] = None
                     player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
                     player['avg_time_dead_pct'] = f"{self.format_percentage(stats.avg_time_dead_pct)}"
                     player['summoner_level'] = stats.summoner_level
@@ -363,6 +365,7 @@ class CardGenerator(commands.Cog):
                     player['kda'] = "N/A"
                     player['pentas'] = 0
                     player['pentas_label'] = 'Pentas'  # Default label
+                    player['avg_placement'] = None
                     player['damage_per_min'] = "N/A"
                     player['avg_time_dead_pct'] = "N/A"
                     player['summoner_level'] = player.get('summonerLevel', 0)

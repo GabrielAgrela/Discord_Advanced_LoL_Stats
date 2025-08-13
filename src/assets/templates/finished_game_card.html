@@ -16,6 +16,19 @@
             font-family: 'Spiegel';
             src: url('/app/src/assets/fonts/Spiegel-Regular.ttf') format('truetype');
         }
+        :root {
+            --primary: {{ theme.primary }};
+            --accent: rgba(215, 185, 110, 0.28);
+            --border: rgba(215, 185, 110, 0.45);
+            --text-dim: #c8d0cc;
+            --elder-forest: #1b2420;
+            --elder-emerald: #347465;
+            --elder-teal: #34a597;
+            --elder-plum: #5c3b8a;
+            --elder-gold: #d7b96e;
+            --elder-gold-soft: rgba(215, 185, 110, 0.45);
+            --elder-leaf: rgba(52, 116, 101, 0.22);
+        }
         body {
             background-color: #000000;
             font-family: 'Spiegel', sans-serif;
@@ -57,25 +70,42 @@
             margin: 0 auto;
         }
         .card {
-            background: linear-gradient(135deg, 
-                rgba(20, 25, 30, 0.85), 
-                rgba(10, 12, 15, 0.95));
-            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(27, 36, 32, 0.65), rgba(23, 18, 36, 0.78));
+            border-radius: 28px;
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(18px);
             margin: 0;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5),
-                        0 5px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 8px 22px rgba(52, 116, 101, 0.18), inset 0 0 0 1px rgba(215, 185, 110, 0.12);
             position: relative;
             overflow: hidden;
             width: 100%;
         }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(1200px 320px at 50% -120px, rgba(52, 116, 101, 0.35) 0%, transparent 60%),
+                        radial-gradient(800px 220px at 10% 0%, rgba(92, 59, 138, 0.22) 0%, transparent 60%);
+            opacity: 0.45;
+        }
+
+        .card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(180deg, rgba(215, 185, 110, 0.10), rgba(215, 185, 110, 0) 18%, rgba(215, 185, 110, 0) 82%, rgba(215, 185, 110, 0.08)),
+                        linear-gradient(90deg, rgba(52, 116, 101, 0.10), rgba(92, 59, 138, 0.10));
+            mix-blend-mode: soft-light;
+        }
         .card-header {
             font-family: 'BeaufortforLOL', sans-serif;
             text-align: center;
-            background: transparent;
-            border: none;
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));
+            border: 0;
             padding: 15px;
             position: relative;
         }
@@ -86,7 +116,7 @@
                          0 2px 20px rgba(0, 0, 0, 0.3);
             letter-spacing: 2px;
             font-weight: 800;
-            color: #e5c100;
+            color: var(--elder-gold);
         }
         .game-info {
             display: flex;
@@ -103,20 +133,18 @@
             gap: 8px;
         }
         .game-info .info-item i {
-            color: #e5c100;
+            color: var(--elder-gold);
         }
         .tracked-players-container {
             padding: 15px 25px;
         }
         .tracked-player-card {
-            background: linear-gradient(135deg, 
-                rgba(22, 25, 28, 0.85), 
-                rgba(15, 18, 21, 0.95));
-            border-radius: 15px;
+            background: linear-gradient(180deg, rgba(52, 116, 101, 0.18), rgba(92, 59, 138, 0.18));
+            border-radius: 18px;
             margin-bottom: 25px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 0 0 1px var(--accent);
+            border: 1px solid var(--accent);
             display: flex;
             flex-direction: column;
         }
@@ -269,11 +297,11 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
             border: 2px solid;
             transform: rotate(-5deg);
-            transition: transform 0.3s ease;
+            transition: none;
         }
         
         .placement-banner:hover {
-            transform: rotate(0deg) scale(1.05);
+            transform: none;
         }
         
         .placement-number {
@@ -398,19 +426,18 @@
         .stats-section {
             margin-top: 10px;
             padding: 20px;
-            background: linear-gradient(135deg, 
-                rgba(15, 20, 25, 0.9), 
-                rgba(10, 15, 20, 0.8));
+            background: linear-gradient(180deg, rgba(52, 116, 101, 0.18), rgba(92, 59, 138, 0.18));
             border-radius: 15px;
             flex: 1;
             display: flex;
             flex-direction: column;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--accent);
         }
         .stats-section-title {
             margin: 0 0 15px 0;
             background: linear-gradient(to right, #e5c100, #ffdf80);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-size: 22px;
@@ -441,14 +468,17 @@
             flex: 1;
         }
         .stat-card {
-            background: rgba(30, 30, 40, 0.8);
-            border-radius: 6px;
+            background: linear-gradient(180deg, rgba(52, 116, 101, 0.18), rgba(92, 59, 138, 0.18));
+            border-radius: 12px;
             padding: 10px;
             text-align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             height: 100%;
+            border: 1px solid var(--accent);
+            position: relative;
+            overflow: hidden;
         }
         .stat-value {
             font-size: 16px;
@@ -465,7 +495,7 @@
         }
         .stat-label {
             font-size: 12px;
-            color: #aaaaaa;
+            color: var(--text-dim);
             margin-top: 2px;
         }
         .positive-stat {
@@ -499,10 +529,10 @@
             border-radius: 10px;
             border-left: 4px solid;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-            transition: transform 0.2s ease;
+            transition: none;
         }
         .insight-item:hover {
-            transform: translateY(-2px);
+            transform: none;
         }
         .insight-positive {
             border-left-color: #4ecca3;
@@ -555,14 +585,10 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
             pointer-events: none;
             opacity: 0;
-            animation: fadeIn 0.3s forwards;
+            animation: none;
         }
         
-        @keyframes fadeIn {
-            to {
-                opacity: 1;
-            }
-        }
+        /* removed animations */
     </style>
 </head>
 <body>
@@ -572,7 +598,7 @@
     <div class="content">
         <div class="card">
             <div class="card-header">
-                <h2>{{ gamemode }} Match Insights</h2>
+                <h2>{{ gamemode_display or gamemode }} Match Insights</h2>
                 <div class="game-info">
                     <div class="info-item">
                         <i class="fas fa-clock"></i>
@@ -670,6 +696,14 @@
                                         </div>
                                         <div class="stat-label">Gold</div>
                                     </div>
+                                    {% if gamemode in ['CHERRY', 'ARENA'] %}
+                                    <div class="stat-card">
+                                        <div class="stat-value">
+                                            {{ '{:,}'.format(player.dpm) }}
+                                        </div>
+                                        <div class="stat-label" title="Arena: Using DPM instead of Efficiency due to unreliable dead time.">DPM</div>
+                                    </div>
+                                    {% else %}
                                     <div class="stat-card">
                                         <div class="stat-value">
                                             {{ '{:.1f}'.format(player.combat_efficiency) }}
@@ -679,6 +713,7 @@
                                         </div>
                                         <div class="stat-label" title="Combat Efficiency: Measures how effectively you dealt damage while staying alive. Higher is better.">Combat Efficiency</div>
                                     </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

@@ -93,9 +93,9 @@ class Loops(commands.Cog):
                                     champion = await self.bot.get_cog("DatabaseOperations").get_champion(participant['championId'])
                                     
                                     stats = await self.bot.get_cog("DatabaseOperations").get_player_stats(
-                                        tracked_user.riot_id_game_name, 
-                                        game_data['gameMode'], 
-                                        champion.replace(" ", "").replace("'", "")
+                                        tracked_user.riot_id_game_name,
+                                        game_data['gameMode'],
+                                        champion
                                     )
 
                                     # Only add to players list and update last_game_played if not announced yet
@@ -179,7 +179,7 @@ class Loops(commands.Cog):
                             if hasattr(message, "thread") and message.thread and not message.thread.archived:
                                 thread = message.thread
                             else:
-                                thread_name = "Results"
+                                thread_name = "Game Over Stats"
                                 thread = await message.create_thread(name=thread_name, auto_archive_duration=1440)
                             target_channel = thread
                             # Try to remove the system "started a thread" message
@@ -383,7 +383,7 @@ class Loops(commands.Cog):
                                     if hasattr(message, "thread") and message.thread and not message.thread.archived:
                                         thread = message.thread
                                     else:
-                                        thread_name = "Results"
+                                        thread_name = "Game Over Stats"
                                         thread = await message.create_thread(name=thread_name, auto_archive_duration=1440)
                                     target_channel = thread
                                     # Try to remove the system "started a thread" message

@@ -308,9 +308,12 @@ class CardGenerator(commands.Cog):
             latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"
 
             # Prepare player data with champion icons and stats
+            is_arena = gamemode in ['CHERRY', 'ARENA']
             for player in players:
-                # Load champion image (tiles for live players card)
+                # Load champion images
                 player['champion_icon'] = self.load_champion_image(player['champion'], "tiles")
+                # Background image behind summoner info uses centered crop
+                player['champion_centered'] = self.load_champion_image(player['champion'], "centered")
                 
                 stats = player['stats']
                 # Read and encode profile icon
@@ -344,7 +347,7 @@ class CardGenerator(commands.Cog):
                     player['winrate'] = f"{self.format_percentage(stats.winrate)}"
                     player['kda'] = f"{stats.average_kda:.2f}"
                     # For Cherry/Arena modes, show first place count instead of pentas
-                    if gamemode in ['CHERRY', 'ARENA']:
+                    if is_arena:
                         player['pentas'] = stats.first_place_count
                         player['pentas_label'] = '1st Places'
                         player['avg_placement'] = f"{stats.avg_placement:.2f}"
@@ -353,6 +356,7 @@ class CardGenerator(commands.Cog):
                         player['pentas_label'] = 'Pentas'
                         player['avg_placement'] = None
                     player['damage_per_min'] = f"{stats.avg_damage_per_minute:.0f}"
+                    # Arena dead% is unreliable; hide it by template logic
                     player['avg_time_dead_pct'] = f"{self.format_percentage(stats.avg_time_dead_pct)}"
                     player['summoner_level'] = stats.summoner_level
                     
@@ -385,7 +389,8 @@ class CardGenerator(commands.Cog):
                 players=players,
                 gamemode=translate(gamemode),
                 theme=theme,
-                background_image=background_image
+                background_image=background_image,
+                is_arena=is_arena
             )
 
             # Set content and wait for it to load
@@ -527,10 +532,13 @@ class CardGenerator(commands.Cog):
                 # Get first player stats object if available
                 player_stat = player_stats[0] if player_stats else None
                 
-                # Calculate combat efficiency
+                # Calculate combat efficiency (skip time-dead in Arena due to unreliable values)
                 damage_dealt = p.get('total_damage_to_champions', 0)
                 damage_mitigated = p.get('damage_self_mitigated', 0)
-                time_dead_pct = p.get('total_time_spent_dead', 0) / p.get('game_duration', 1800) * 100 if p.get('game_duration', 1800) > 0 else 0
+                if gamemode in ['CHERRY', 'ARENA']:
+                    time_dead_pct = 0
+                else:
+                    time_dead_pct = p.get('total_time_spent_dead', 0) / p.get('game_duration', 1800) * 100 if p.get('game_duration', 1800) > 0 else 0
                 
                 # Calculate combat efficiency score: (damage dealt + damage mitigated) / (1 + time dead percentage)
                 combat_efficiency = (damage_dealt + damage_mitigated) / (1 + time_dead_pct/10) if time_dead_pct > 0 else damage_dealt + damage_mitigated
@@ -541,13 +549,26 @@ class CardGenerator(commands.Cog):
                 # Store the combat efficiency value
                 p['combat_efficiency'] = normalized_efficiency
                 
+                # Normalize kill participation to percentage (0-100) before any classification/comparison
+                if 'kill_participation' in p:
+                    current_kp = p.get('kill_participation', 0)
+                    if current_kp <= 1:
+                        p['kill_participation'] = current_kp * 100
+                    else:
+                        p['kill_participation'] = current_kp
+
                 # Process player stats for tracked players
                 p['performance'] = {
                     'kda': p.get('kda', 0),
                     'kda_class': self._classify_stat(p.get('kda', 0), getattr(player_stat, 'average_kda', 2.5), 1.5),
                     'dmg_class': self._classify_stat(p.get('total_damage_to_champions', 0), getattr(player_stat, 'avg_damage_per_minute', 500) * (p.get('game_duration', 1800) / 60), 5000),
                     'kp_class': self._classify_stat(p.get('kill_participation', 0), getattr(player_stat, 'avg_kill_participation', 50), 15),
-                    'cs_class': self._classify_stat(p.get('total_minions_killed', 0), getattr(player_stat, 'avg_cs', 150) if hasattr(player_stat, 'avg_cs') else 150, 30),
+                    # Compare CS against expected CS for the game duration based on avg CS per minute
+                    'cs_class': self._classify_stat(
+                        p.get('total_minions_killed', 0),
+                        (getattr(player_stat, 'avg_cs_per_min', 5.0) * (p.get('game_duration', 1800) / 60)),
+                        30
+                    ),
                     'gold_class': self._classify_stat(p.get('gold_earned', 0), getattr(player_stat, 'avg_gold_per_min', 350) * (p.get('game_duration', 1800) / 60), 2000),
                     'efficiency_class': self._classify_stat(normalized_efficiency, 50, 15)
                 }
@@ -569,7 +590,7 @@ class CardGenerator(commands.Cog):
                 # Default values for comparison if player_stat is None
                 default_avg_kda = 2.5
                 default_avg_dpm = 500
-                default_avg_cs = 150
+                default_avg_cs_per_min = 5.0
                 default_avg_gold_per_min = 350
                 default_avg_efficiency = 50
                 default_avg_kp = 50
@@ -591,9 +612,10 @@ class CardGenerator(commands.Cog):
                         actual_damage = p.get('total_damage_to_champions', 0)
                         comparison['dmg_percent'] = ((actual_damage - expected_damage) / expected_damage) * 100 if expected_damage > 0 else 0
                     
-                    avg_cs = getattr(player_stat, 'avg_cs', default_avg_cs)
-                    if avg_cs > 0:
-                        comparison['cs_percent'] = ((p.get('total_minions_killed', 0) - avg_cs) / avg_cs) * 100
+                    avg_cs_per_min = getattr(player_stat, 'avg_cs_per_min', default_avg_cs_per_min)
+                    expected_cs = avg_cs_per_min * game_duration_minutes
+                    if expected_cs > 0:
+                        comparison['cs_percent'] = ((p.get('total_minions_killed', 0) - expected_cs) / expected_cs) * 100
                     
                     avg_gold_per_min = getattr(player_stat, 'avg_gold_per_min', default_avg_gold_per_min)
                     if avg_gold_per_min > 0:
@@ -603,22 +625,26 @@ class CardGenerator(commands.Cog):
                     else:
                         comparison['gold_percent'] = 100 if p.get('gold_earned', 0) > 0 else 0
                     
-                    avg_efficiency = getattr(player_stat, 'combat_efficiency', 50)
-                    if avg_efficiency > 0:
-                        comparison['efficiency_percent'] = ((normalized_efficiency - avg_efficiency) / avg_efficiency) * 100
+                    # Derive an average normalized combat efficiency from per-minute averages
+                    avg_time_dead_pct = getattr(player_stat, 'avg_time_dead_pct', 15)
+                    avg_mitigated_per_min = getattr(player_stat, 'avg_damage_taken_per_min', 500)
+                    avg_expected_damage = avg_dpm * game_duration_minutes
+                    avg_expected_mitigated = avg_mitigated_per_min * game_duration_minutes
+                    avg_combat_efficiency = (avg_expected_damage + avg_expected_mitigated) / (1 + (avg_time_dead_pct / 10)) if avg_time_dead_pct > 0 else (avg_expected_damage + avg_expected_mitigated)
+                    avg_normalized_efficiency = min(100, avg_combat_efficiency / 1000)
+                    if avg_normalized_efficiency > 0:
+                        comparison['efficiency_percent'] = ((normalized_efficiency - avg_normalized_efficiency) / avg_normalized_efficiency) * 100
                     else:
                         comparison['efficiency_percent'] = 100 if normalized_efficiency > 0 else 0
                     
                     # Calculate raw differences
                     comparison['kda'] = p.get('kda', 0) - avg_kda
                     comparison['damage'] = p.get('total_damage_to_champions', 0) - (avg_dpm * game_duration_minutes)
-                    comparison['efficiency'] = normalized_efficiency - avg_efficiency
+                    comparison['efficiency'] = normalized_efficiency - avg_normalized_efficiency
                     
                     # Add kill participation comparison
-                    # Make sure kill_participation is in percentage (0-100 scale)
+                    # kill_participation already normalized to percentage above
                     player_kp = p.get('kill_participation', 0)
-                    if player_kp <= 1:  # If it's in 0-1 scale, convert to percentage
-                        player_kp = player_kp * 100
                     
                     avg_kp = getattr(player_stat, 'avg_kill_participation', default_avg_kp)
                     comparison['kp'] = player_kp - avg_kp
@@ -632,7 +658,8 @@ class CardGenerator(commands.Cog):
                     actual_damage = p.get('total_damage_to_champions', 0)
                     comparison['dmg_percent'] = ((actual_damage - expected_damage) / expected_damage) * 100 if expected_damage > 0 else 0
                     
-                    comparison['cs_percent'] = ((p.get('total_minions_killed', 0) - default_avg_cs) / default_avg_cs) * 100
+                    expected_cs = default_avg_cs_per_min * game_duration_minutes
+                    comparison['cs_percent'] = ((p.get('total_minions_killed', 0) - expected_cs) / expected_cs) * 100 if expected_cs > 0 else 0
                     
                     expected_gold = default_avg_gold_per_min * game_duration_minutes
                     actual_gold = p.get('gold_earned', 0)
@@ -644,10 +671,8 @@ class CardGenerator(commands.Cog):
                     comparison['damage'] = p.get('total_damage_to_champions', 0) - expected_damage
                     comparison['efficiency'] = normalized_efficiency - default_avg_efficiency
                     
-                    # Make sure kill_participation is in percentage (0-100 scale)
+                    # kill_participation already normalized to percentage above
                     player_kp = p.get('kill_participation', 0)
-                    if player_kp <= 1:  # If it's in 0-1 scale, convert to percentage
-                        player_kp = player_kp * 100
                     
                     comparison['kp'] = player_kp - default_avg_kp
                 
@@ -665,17 +690,17 @@ class CardGenerator(commands.Cog):
                 p['assists'] = p.get('assists', 0)
                 p['damage'] = p.get('total_damage_to_champions', 0)
                 p['damage_mitigated'] = p.get('damage_self_mitigated', 0)
-                p['time_dead_pct'] = p.get('total_time_spent_dead', 0) / p.get('game_duration', 1800) * 100 if p.get('game_duration', 1800) > 0 else 0
+                # For Arena: hide dead% downstream; keep 0 here to avoid misleading values
+                if gamemode in ['CHERRY', 'ARENA']:
+                    p['time_dead_pct'] = 0
+                else:
+                    p['time_dead_pct'] = p.get('total_time_spent_dead', 0) / p.get('game_duration', 1800) * 100 if p.get('game_duration', 1800) > 0 else 0
                 
                 # Calculate DPM (Damage Per Minute)
                 game_minutes = p.get('game_duration', 1800) / 60
                 p['dpm'] = round(p.get('total_damage_to_champions', 0) / game_minutes) if game_minutes > 0 else 0
                 
-                # Ensure kill_participation is in percentage format (0-100)
-                kill_participation = p.get('kill_participation', 0)
-                if kill_participation <= 1:  # If it's in 0-1 scale, convert to percentage
-                    kill_participation = kill_participation * 100
-                p['kill_participation'] = kill_participation
+                # kill_participation already normalized above
                 
                 p['cs'] = p.get('total_minions_killed', 0)
                 p['gold'] = p.get('gold_earned', 0)
@@ -699,7 +724,8 @@ class CardGenerator(commands.Cog):
                     'gold': p.get('gold_earned', 0),
                     'damage_mitigated': p.get('damage_mitigated', 0),
                     'time_dead_pct': p.get('time_dead_pct', 0),
-                    'gamemode': gamemode
+                    'gamemode': gamemode,
+                    'placement': p.get('placement')
                 }
                 p['insights'] = await self._generate_champion_insights(player_data, player_stat)
                 
@@ -791,6 +817,7 @@ class CardGenerator(commands.Cog):
                         team1_damage=team1_damage or 0,
                         team2_damage=team2_damage or 0,
                         gamemode=gamemode or "Unknown",
+                        gamemode_display=translate(gamemode or "Unknown"),
                         game_duration=formatted_duration,
                         background_image=background_image,
                         theme=theme
@@ -894,15 +921,16 @@ class CardGenerator(commands.Cog):
             avg_time_dead = getattr(global_champion_stats, 'avg_time_dead_pct', 15)
             avg_cs_per_min = getattr(global_champion_stats, 'avg_cs_per_min', 5)
             avg_gold_per_min = getattr(global_champion_stats, 'avg_gold_per_min', 350)
-            avg_dmg_mitigated = getattr(global_champion_stats, 'avg_damage_mitigated', 500)
+            avg_damage_taken_per_min = getattr(global_champion_stats, 'avg_damage_taken_per_min', 500)
             comparison_text = f"the average for {champion_name} in this game mode"
         else:
             avg_kda = getattr(champion_stats, 'average_kda', 2.5) if champion_specific else getattr(player_stat, 'average_kda', 2.5)
             avg_dpm = getattr(champion_stats, 'avg_damage_per_minute', 500) if champion_specific else getattr(player_stat, 'avg_damage_per_minute', 500)
-            avg_kp = getattr(champion_stats, 'avg_kill_participation', 50) if champion_specific else getattr(player_stat, 'avg_kp', 50)
+            avg_kp = getattr(champion_stats, 'avg_kill_participation', 50) if champion_specific else getattr(player_stat, 'avg_kill_participation', 50)
             avg_time_dead = getattr(champion_stats, 'avg_time_dead_pct', 15) if champion_specific else getattr(player_stat, 'avg_time_dead_pct', 15)
             avg_cs_per_min = getattr(champion_stats, 'avg_cs_per_min', 5) if champion_specific else getattr(player_stat, 'avg_cs_per_min', 5)
             avg_gold_per_min = getattr(champion_stats, 'avg_gold_per_min', 350) if champion_specific else getattr(player_stat, 'avg_gold_per_min', 350)
+            avg_damage_taken_per_min = getattr(champion_stats, 'avg_damage_taken_per_min', 500) if champion_specific else getattr(player_stat, 'avg_damage_taken_per_min', 500)
             comparison_text = f"your average with {champion_name}" if champion_specific else "your overall average"
         
         kda_diff = kda - avg_kda
@@ -973,17 +1001,28 @@ class CardGenerator(commands.Cog):
         # Normalize to a 0-100 scale for easier understanding
         normalized_efficiency = min(100, combat_efficiency / 1000)
         
-        # Get average combat efficiency for comparison
+        # Get average combat efficiency for comparison using per-minute averages scaled by this game's length
         avg_damage = avg_dpm * game_duration_minutes
-        avg_mitigated = getattr(global_champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if global_champion_stats else (getattr(champion_stats, 'avg_damage_taken_per_min', 500) * game_duration_minutes if champion_specific else getattr(player_stat, 'avg_damage_taken_per_min', 500) * game_duration_minutes)
-        
-        avg_combat_efficiency = (avg_damage + avg_dmg_mitigated) / (1 + avg_time_dead/10) if avg_time_dead > 0 else avg_damage + avg_dmg_mitigated
+        avg_mitigated = avg_damage_taken_per_min * game_duration_minutes
+        if gamemode in ['CHERRY', 'ARENA']:
+            # Arena: ignore avg_time_dead due to unreliable values
+            avg_combat_efficiency = (avg_damage + avg_mitigated)
+        else:
+            avg_combat_efficiency = (avg_damage + avg_mitigated) / (1 + avg_time_dead/10) if avg_time_dead > 0 else (avg_damage + avg_mitigated)
         avg_normalized_efficiency = min(100, avg_combat_efficiency / 1000)
         
         efficiency_diff = normalized_efficiency - avg_normalized_efficiency
         efficiency_percent = (normalized_efficiency / avg_normalized_efficiency - 1) * 100 if avg_normalized_efficiency > 0 else 0
         
-        if efficiency_diff > 10:
+        if gamemode in ['CHERRY', 'ARENA']:
+            # Arena insights: prefer DPM/gold/placement cues; avoid efficiency comparisons
+            if player.get('placement') and player.get('placement') <= 2:
+                insights.append({
+                    'type': 'positive',
+                    'icon': 'fas fa-trophy',
+                    'text': f"Top finish in Arena (place {int(player.get('placement'))}). Great job!"
+                })
+        elif efficiency_diff > 10:
             insights.append({
                 'type': 'positive',
                 'icon': 'fas fa-fist-raised',
@@ -1001,7 +1040,7 @@ class CardGenerator(commands.Cog):
                 'icon': 'fas fa-fist-raised',
                 'text': f'Great combat presence! You dealt high damage while staying alive.'
             })
-        elif time_dead_pct > 25:
+        elif time_dead_pct > 25 and gamemode not in ['CHERRY', 'ARENA']:
             insights.append({
                 'type': 'negative',
                 'icon': 'fas fa-skull',

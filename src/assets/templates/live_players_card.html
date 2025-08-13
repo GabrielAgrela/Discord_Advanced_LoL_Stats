@@ -18,9 +18,17 @@
         }
         :root {
             --primary: {{ theme.primary }};
-            --accent: rgba(255, 255, 255, 0.08);
-            --border: rgba(255, 255, 255, 0.12);
-            --text-dim: #a9b0b6;
+            --accent: rgba(215, 185, 110, 0.28);
+            --border: rgba(215, 185, 110, 0.45);
+            --text-dim: #c8d0cc;
+            /* Elderwood palette */
+            --elder-forest: #1b2420;
+            --elder-emerald: #347465;
+            --elder-teal: #34a597;
+            --elder-plum: #5c3b8a;
+            --elder-gold: #d7b96e;
+            --elder-gold-soft: rgba(215, 185, 110, 0.45);
+            --elder-leaf: rgba(52, 116, 101, 0.22);
         }
         body {
             background-color: transparent;
@@ -46,7 +54,7 @@
             inset: 0;
             background-size: cover;
             background-position: center;
-            filter: saturate(0.9) brightness(0.9);
+            filter: saturate(1.05) brightness(0.98) hue-rotate(-6deg);
         }
         .content {
             position: relative;
@@ -55,13 +63,13 @@
             width: 100%;
         }
         .card {
-            background: linear-gradient(180deg, rgba(18, 21, 24, 0.7), rgba(10, 12, 14, 0.85));
+            background: linear-gradient(180deg, rgba(27, 36, 32, 0.65), rgba(23, 18, 36, 0.78));
             border-radius: 28px;
             color: white;
             border: 1px solid var(--border);
             backdrop-filter: blur(18px);
             margin: 140px 160px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 6px 18px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 8px 22px rgba(52, 116, 101, 0.18), inset 0 0 0 1px rgba(215, 185, 110, 0.12);
             position: relative;
             overflow: hidden;
         }
@@ -70,8 +78,18 @@
             position: absolute;
             inset: 0;
             pointer-events: none;
-            background: radial-gradient(1200px 300px at 50% -100px, color-mix(in oklab, var(--primary) 30%, transparent) 0%, transparent 60%);
-            opacity: 0.35;
+            background: radial-gradient(1200px 320px at 50% -120px, rgba(52, 116, 101, 0.35) 0%, transparent 60%),
+                        radial-gradient(800px 220px at 10% 0%, rgba(92, 59, 138, 0.22) 0%, transparent 60%);
+            opacity: 0.45;
+        }
+        .card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(180deg, rgba(215, 185, 110, 0.10), rgba(215, 185, 110, 0) 18%, rgba(215, 185, 110, 0) 82%, rgba(215, 185, 110, 0.08)),
+                        linear-gradient(90deg, rgba(52, 116, 101, 0.10), rgba(92, 59, 138, 0.10));
+            mix-blend-mode: soft-light;
         }
         .card-header {
             font-family: 'BeaufortforLOL', sans-serif;
@@ -87,7 +105,7 @@
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 2px 20px rgba(0, 0, 0, 0.3);
             letter-spacing: 1.2px;
             font-weight: 800;
-            color: var(--primary);
+            color: var(--elder-gold);
         }
         .players-grid {
             display: flex;
@@ -96,29 +114,18 @@
             padding: 20px 24px 28px;
         }
         .player-card {
-            background: linear-gradient(180deg, rgba(30, 35, 40, 0.9), rgba(15, 18, 20, 0.95));
             border-radius: 18px;
             padding: 14px 20px;
             display: flex;
             gap: 18px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32), inset 0 0 0 1px var(--accent);
-            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            background: linear-gradient(180deg, rgba(52, 116, 101, 0.18), rgba(92, 59, 138, 0.18));
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 0 0 1px var(--accent);
             width: 100%;
             height: auto;
             align-items: center;
             position: relative;
         }
-        .player-card::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border: 1px solid transparent;
-            border-radius: 18px;
-            background: linear-gradient(180deg, transparent, transparent) padding-box,
-                        linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.0), rgba(255,255,255,0.05)) border-box;
-            pointer-events: none;
-        }
+
         .player-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 0 0 1px var(--accent);
@@ -128,7 +135,7 @@
             height: 120px;
             border-radius: 12px;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-            border: 2px solid var(--accent);
+            border: 2px solid var(--border);
             flex-shrink: 0;
             object-fit: cover;
         }
@@ -146,21 +153,62 @@
             min-width: 200px;
         }
         .profile-container {
+            position: relative;
+            display: flex;
+            align-items: center; /* vertically center content */
+            justify-content: flex-start; /* keep content on the left */
+            gap: 8px;
+            border-radius: 16px;
+            padding: 2px 2px;
+            border: 1px solid var(--accent);
+            height: 160px; /* increased prominence */
+            aspect-ratio: 1280 / 720; /* keep original centered art ratio */
+            background-size: contain; /* preserve ratio without cropping */
+            background-repeat: no-repeat;
+            background-position: center;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(215, 185, 110, 0.12) inset;
+        }
+        .profile-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(600px 200px at 0% 100%, rgba(52, 116, 101, 0.20), transparent 60%),
+                        radial-gradient(500px 180px at 100% 0%, rgba(92, 59, 138, 0.18), transparent 60%);
+        }
+        .profile-content {
+			z-index: 1;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: flex-end;
+			border: 1px solid var(--accent);
+			border-radius: 30px;
+			padding: 2px 2px;
+            padding-right: 10px;
+            padding-left: 8px;
+			backdrop-filter: blur(4px) saturate(1.2);
+			background: linear-gradient(90deg, rgba(215, 185, 110, 0.12), rgba(52, 116, 101, 0.10));
+			box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+            /* but at bottom of profile-container */
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+        }
+        .profile-text {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            background: rgba(30, 35, 40, 0.5);
-            border-radius: 16px;
-            padding: 8px 10px 10px;
-            border: 1px solid var(--accent);
-            min-width: 180px;
+            align-items: flex-start;
+            gap: 2px;
+            margin-right: 5px;
+            margin-left: 5px;
         }
         .profile-icon {
-            width: 72px;
-            height: 72px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid var(--accent);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             object-fit: cover;
         }
@@ -170,7 +218,7 @@
             font-weight: 800;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
             margin: 0;
-            text-align: center;
+            text-align: left;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -181,12 +229,10 @@
             color: var(--text-dim);
             font-weight: 600;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid var(--accent);
+
         }
         .champion-name {
-            color: {{ theme.primary }};
+            color: var(--primary);
             font-size: 18px;
             margin-bottom: 15px;
             font-weight: 600;
@@ -199,7 +245,7 @@
             align-items: stretch;
         }
         .stat-box {
-            background: rgba(30, 35, 40, 0.5);
+            background: linear-gradient(180deg, rgba(52, 116, 101, 0.18), rgba(92, 59, 138, 0.18));
             border-radius: 12px;
             padding: 10px 12px;
             text-align: center;
@@ -216,7 +262,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: radial-gradient(600px 120px at 50% -80px, rgba(255,255,255,0.06), transparent 60%);
+            background: radial-gradient(600px 120px at 50% -80px, rgba(215, 185, 110, 0.12), transparent 60%);
             pointer-events: none;
         }
         .stat-value {
@@ -230,19 +276,33 @@
             text-transform: uppercase;
             letter-spacing: 0.6px;
         }
+        /* Dynamic color helper using CSS variables set inline */
+        .dynamic-color { color: rgb(var(--r), var(--g), var(--b)); }
+
+        /* Dynamic progress bar using CSS variables set inline */
+        .progress-fill.dynamic { width: calc(var(--progress) * 1%); background: rgb(var(--r), var(--g), var(--b)); }
+        .progress-fill.dead { width: calc(var(--progress) * 1%); background: linear-gradient(90deg, #b84b4b, #ff6363); }
+
+        /* Fine tune spacing for level in the banner */
+        .profile-content .summoner-level { margin-top: 2px; }
+        .profile-content .champion-name {
+            margin-top: 0;
+            margin-bottom: 0;
+            font-size: 10px;
+        }
         /* Progress bars for Winrate and Dead% */
         .progress-wrap {
             margin-top: 8px;
             height: 6px;
             width: 100%;
-            background: rgba(255,255,255,0.08);
+            background: rgba(215, 185, 110, 0.10);
             border-radius: 999px;
             overflow: hidden;
             border: 1px solid var(--accent);
         }
         .progress-fill {
             height: 100%;
-            background: var(--primary);
+            background: linear-gradient(90deg, rgba(52, 116, 101, 0.9), rgba(92, 59, 138, 0.9));
             width: 0;
         }
     </style>
@@ -261,26 +321,31 @@
                 <div class="player-card">
                     
                     <div class="player-info">
-                        <div class="profile-container">
-                            <div class="player-name">{{ player.name }}</div>
-                            <img src="data:image/jpeg;base64,{{player.profile_icon}}" class="profile-icon" alt="Profile Icon">
-                            <div class="summoner-level">Level {{player.summoner_level}}</div>
+                        <div class="profile-container" style="background-image: url('data:image/jpeg;base64,{{ player.champion_centered }}');">
+                            <div class="profile-content">
+                                <img src="data:image/jpeg;base64,{{player.profile_icon}}" class="profile-icon" alt="Profile Icon" style="margin: 0;">
+                                <div class="profile-text">
+                                    <div class="player-name">{{ player.name}}</div>
+                                    <div class="summoner-level">Level {{player.summoner_level}}</div>
+                                    <div class="champion-name">{{ player.champion }}</div>
+                                </div>
+                            </div>
                         </div>
-                        <img class="champion-icon" src="data:image/jpeg;base64,{{player.champion_icon}}" alt="{{ player.champion }}">
+                        
                         <div class="stats-grid">
                             <div class="stat-box">
                                 <div class="stat-value">{{ player.games }}</div>
                                 <div class="stat-label">Games</div>
                             </div>
                             <div class="stat-box">
-                                <div class="stat-value" style="color: rgb{{player.winrate_color}}">{{ player.winrate }}%</div>
+                                <div class="stat-value dynamic-color" style="--r: {{ player.winrate_color[0] }}; --g: {{ player.winrate_color[1] }}; --b: {{ player.winrate_color[2] }};">{{ player.winrate }}%</div>
                                 <div class="stat-label">Win Rate</div>
                                 <div class="progress-wrap">
-                                    <div class="progress-fill" style="width: {{ player.winrate }}%; background: rgb{{player.winrate_color}};"></div>
+                                    <div class="progress-fill dynamic" style="--progress: {{ player.winrate }}; --r: {{ player.winrate_color[0] }}; --g: {{ player.winrate_color[1] }}; --b: {{ player.winrate_color[2] }};"></div>
                                 </div>
                             </div>
                             <div class="stat-box">
-                                <div class="stat-value" style="color: rgb{{player.kda_color}}">{{ player.kda }}</div>
+                                <div class="stat-value dynamic-color" style="--r: {{ player.kda_color[0] }}; --g: {{ player.kda_color[1] }}; --b: {{ player.kda_color[2] }};">{{ player.kda }}</div>
                                 <div class="stat-label">KDA</div>
                             </div>
                             <div class="stat-box">
@@ -288,14 +353,19 @@
                                 <div class="stat-label">DMG/m</div>
                             </div>
                             <div class="stat-box">
+                                {% if is_arena %}
+                                <div class="stat-value">{{ player.avg_placement }}</div>
+                                <div class="stat-label">Avg Place</div>
+                                {% else %}
                                 <div class="stat-value">{{ player.avg_time_dead_pct }}%</div>
                                 <div class="stat-label">Dead%</div>
                                 <div class="progress-wrap">
-                                    <div class="progress-fill" style="width: {{ player.avg_time_dead_pct }}%; background: linear-gradient(90deg, #b84b4b, #ff6363);"></div>
+                                    <div class="progress-fill dead" style="--progress: {{ player.avg_time_dead_pct }};"></div>
                                 </div>
+                                {% endif %}
                             </div>
                             <div class="stat-box">
-                                <div class="stat-value">{{ player.pentas }}{% if player.avg_placement %} (avg {{ player.avg_placement }}){% endif %}</div>
+                                <div class="stat-value">{{ player.pentas }}</div>
                                 <div class="stat-label">{{ player.pentas_label }}</div>
                             </div>
                         </div>

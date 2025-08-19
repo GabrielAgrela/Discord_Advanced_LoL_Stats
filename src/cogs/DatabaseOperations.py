@@ -460,7 +460,7 @@ class DatabaseOperations(commands.Cog):
                 data = await response.json()
                 for champ_name, champ_data in data['data'].items():
                     if int(champ_data['key']) == id:
-                        return champ_data['name']
+                        return champ_data['id']
         return None
 
     async def insert_match(self, match_data):

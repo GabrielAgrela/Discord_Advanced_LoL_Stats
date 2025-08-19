@@ -83,6 +83,10 @@ class RiotAPIOperations(commands.Cog):
                             continue
                         elif response.status == 404:
                             return None
+                        elif response.status == 0:
+                            print(f"Connection error. Attempt {attempt + 1}/{max_retries}")
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
                         elif response.status == 502:
                             print(f"Bad Gateway. Attempt {attempt + 1}/{max_retries}")
                             #print url and params

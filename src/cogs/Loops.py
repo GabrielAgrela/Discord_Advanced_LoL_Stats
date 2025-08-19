@@ -198,7 +198,6 @@ class Loops(commands.Cog):
                                     ):
                                         try:
                                             await recent_msg.delete()
-                                            await message.edit(embed=None)
                                         except Exception as de:
                                             print(f"Could not delete system thread message for game {game_id}: {de}")
                                         break
@@ -263,6 +262,8 @@ class Loops(commands.Cog):
                             except disnake.NotFound: # If message is already deleted, just send to channel
                                 pass 
                             await target_channel.send(embed=error_embed)
+                        finally:
+                            await message.edit(embed=None)
                         
                         # Do not delete the original message; keep it as the parent of the thread with results
                         # (Previously deleted the message after a short delay.)

@@ -72,22 +72,30 @@ class CardGenerator(commands.Cog):
         return formatted
             
     def get_winrate_color(self, winrate: float) -> tuple[int, int, int]:
-        """Return RGB color tuple based on winrate percentage"""
-        if winrate <= 40:
-            return (255, 0, 0)
-        elif winrate >= 60:
-            return (0, 255, 0)
-        else:
-            t = (winrate - 40) / 20
-            if t <= 0.5:
-                t2 = t * 2
-                t3 = t2 * t2 * t2
-                return (255, int(255 * t3), 0)
-            else:
-                t2 = (t - 0.5) * 2
-                green = 255
-                red = int(255 * (1 - (t2 * t2)))
-                return (red, green, 0)
+        """Return RGB color tuple based on winrate percentage using specified gradient stops."""
+        # Clamp input to [0, 100]
+        value = max(0.0, min(100.0, float(winrate)))
+        # Gradient stops: (percent, (r, g, b))
+        stops = [
+            (0.0,   (0, 0, 0)),          # black
+            (25.0,  (255, 0, 0)),        # red
+            (50.0,  (255, 255, 0)),      # yellow
+            (75.0,  (0, 255, 0)),        # green
+            (100.0, (51, 204, 255)),    # light blue
+        ]
+        # Interpolate between bounding stops
+        for i in range(len(stops) - 1):
+            left_pct, left_color = stops[i]
+            right_pct, right_color = stops[i + 1]
+            if left_pct <= value <= right_pct:
+                span = right_pct - left_pct
+                alpha = 0.0 if span == 0 else (value - left_pct) / span
+                r = int(round(left_color[0] + (right_color[0] - left_color[0]) * alpha))
+                g = int(round(left_color[1] + (right_color[1] - left_color[1]) * alpha))
+                b = int(round(left_color[2] + (right_color[2] - left_color[2]) * alpha))
+                return (r, g, b)
+        # Fallback (should not occur due to clamping)
+        return stops[-1][1]
 
     def get_kda_color(self, kda: float, theme: dict) -> tuple[int, int, int]:
         """Return RGB color tuple based on KDA value"""
@@ -314,6 +322,8 @@ class CardGenerator(commands.Cog):
                 player['champion_icon'] = self.load_champion_image(player['champion'], "tiles")
                 # Background image behind summoner info uses centered crop
                 player['champion_centered'] = self.load_champion_image(player['champion'], "centered")
+                # Background image behind summoner info uses centered crop
+                player['champion_splash'] = self.load_champion_image(player['champion'], "splash")
                 
                 stats = player['stats']
                 # Read and encode profile icon

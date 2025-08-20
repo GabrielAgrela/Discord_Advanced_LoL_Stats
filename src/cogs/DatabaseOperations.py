@@ -977,7 +977,9 @@ class DatabaseOperations(commands.Cog):
                 p.puuid, p.summoner_level, p.kda, p.kill_participation,
                 p.total_damage_dealt, p.damage_self_mitigated,
                 p.total_heal, p.total_heals_on_teammates,
-                p.total_damage_shielded_on_teammates, p.placement
+                p.total_damage_shielded_on_teammates, p.placement,
+                p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6,
+                p.player_augment1, p.player_augment2, p.player_augment3, p.player_augment4
             FROM participants p
             WHERE p.match_id = ?
             ORDER BY p.team_id, p.total_damage_to_champions DESC

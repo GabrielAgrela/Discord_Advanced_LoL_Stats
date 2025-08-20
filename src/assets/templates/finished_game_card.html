@@ -615,34 +615,58 @@
                         <img class="champion-splash" src="data:image/jpeg;base64,{{player.champion_splash}}" alt="{{ player.champion }}">
                         <div class="player-banner-content">
                             <div class="player-info-row">
-                                <img class="summoner-icon" src="data:image/jpeg;base64,{{player.profile_icon_img}}" alt="Summoner Icon">
-                                <div class="player-name-container">
-                                    <h3 class="player-name">{{ player.name }}</h3>
-                                    <div class="player-result {{ 'result-victory' if player.win else 'result-defeat' }}">
-                                        {{ 'Victory' if player.win else 'Defeat' }} • {{ player.kills }}/{{ player.deaths }}/{{ player.assists }}
+                                    <img class="summoner-icon" src="data:image/jpeg;base64,{{player.profile_icon_img}}" alt="Summoner Icon">
+                                    <div class="player-name-container">
+                                        <h3 class="player-name">{{ player.name }}</h3>
+                                        <div class="player-result {{ 'result-victory' if player.win else 'result-defeat' }}">
+                                            {{ 'Victory' if player.win else 'Defeat' }} • {{ player.kills }}/{{ player.deaths }}/{{ player.assists }}
+                                        </div>
+                                        {% if player.premades %}
+                                        <div class="tracked-players">
+                                            <span class="tracked-label">Premade with:</span>
+                                            {% for premade in player.premades %}
+                                            <span class="tracked-player">
+                                                {% if premade.profile_icon %}
+                                                <img src="data:image/png;base64,{{premade.profile_icon}}" class="tracked-champion-icon" alt="{{ premade.name }}">
+                                                {% endif %}
+                                                {{ premade.name }}
+                                            </span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
                                     </div>
-                                    {% if player.premades %}
-                                    <div class="tracked-players">
-                                        <span class="tracked-label">Premade with:</span>
-                                        {% for premade in player.premades %}
-                                        <span class="tracked-player">
-                                            {% if premade.profile_icon %}
-                                            <img src="data:image/png;base64,{{premade.profile_icon}}" class="tracked-champion-icon" alt="{{ premade.name }}">
-                                            {% endif %}
-                                            {{ premade.name }}
-                                        </span>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
+                                    
                                 </div>
-                                {% if player.placement and player.placement > 0 %}
+                            </div>
+                            {% if player.placement and player.placement > 0 %}
+                            <div style="position:absolute; top: 10px; right: 12px; z-index: 4;">
                                 <div class="placement-banner {% if player.placement == 1 %}placement-1st{% elif player.placement == 2 %}placement-2nd{% elif player.placement == 3 %}placement-3rd{% else %}placement-other{% endif %}">
                                     <div class="placement-number">{{ player.placement }}</div>
                                     <div class="placement-suffix">{% if player.placement == 1 %}ST{% elif player.placement == 2 %}ND{% elif player.placement == 3 %}RD{% else %}TH{% endif %}</div>
                                     <div class="placement-text">PLACE</div>
                                 </div>
-                                {% endif %}
                             </div>
+                            {% endif %}
+                            {% if player.built_items or player.arena_augments %}
+                            <div style="position:absolute; right: 12px; bottom: 10px; z-index: 4;">
+                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                                    {% if player.arena_augments %}
+                                    <div class="augment-row" style="display:flex; align-items:center; gap:6px; padding:3px 5px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+                                        {% for aug in player.arena_augments %}
+                                        <img src="data:image/png;base64,{{ aug }}" alt="Augment" style="width:22px; height:22px; border-radius:4px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 1px 4px rgba(0,0,0,0.35); background: rgba(0,0,0,0.25);">
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    {% if player.built_items %}
+                                    <div class="items-row" style="display:flex; align-items:center; gap:6px; padding:4px 6px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+                                        {% for item in player.built_items %}
+                                        <img src="data:image/png;base64,{{ item }}" alt="Item" style="width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 2px 6px rgba(0,0,0,0.4); background: rgba(0,0,0,0.25);">
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     

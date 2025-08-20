@@ -535,6 +535,54 @@ class CardGenerator(commands.Cog):
                     print(f"Warning: Could not load champion splash for {champion}: {e}")
                     # Try with Zed as fallback
                     p['champion_splash'] = self.load_champion_image("Zed", "centered")
+
+                # Load built item icons (including trinket) for banner display
+                try:
+                    gamedata_path = os.path.join(self.assets_path, "gamedata")
+                    patch_folders = [
+                        d for d in os.listdir(gamedata_path)
+                        if os.path.isdir(os.path.join(gamedata_path, d)) and d not in ['img']
+                    ]
+                    latest_patch = sorted(patch_folders)[0] if patch_folders else "15.1.1"
+                except Exception:
+                    latest_patch = "15.1.1"
+
+                items_b64 = []
+                # item0..item5 are inventory items, item6 is trinket
+                for i in range(0, 7):
+                    item_id = int(p.get(f'item{i}', 0) or 0)
+                    if item_id <= 0:
+                        continue
+                    item_path = os.path.join(
+                        self.assets_path, "gamedata", latest_patch, "img", "item", f"{item_id}.png"
+                    )
+                    try:
+                        if os.path.exists(item_path):
+                            with open(item_path, "rb") as img_file:
+                                items_b64.append(base64.b64encode(img_file.read()).decode('utf-8'))
+                    except Exception:
+                        continue
+
+                # Use key name that won't collide with dict.items() in Jinja
+                p['built_items'] = items_b64
+
+                # Load Arena augments icons if present, show above items
+                augments_b64 = []
+                for i in range(1, 5):
+                    aug_id = int(p.get(f'player_augment{i}', 0) or 0)
+                    if aug_id <= 0:
+                        continue
+                    aug_path = os.path.join(
+                        self.assets_path, "gamedata", latest_patch, "img", "tft-arena", f"{aug_id}.png"
+                    )
+                    try:
+                        if os.path.exists(aug_path):
+                            with open(aug_path, "rb") as img_file:
+                                augments_b64.append(base64.b64encode(img_file.read()).decode('utf-8'))
+                    except Exception:
+                        continue
+                if augments_b64:
+                    p['arena_augments'] = augments_b64
                 
                 # Get player stats for comparison
                 player_stats = await db_ops.get_player_stats(p['riot_id_game_name'], gamemode, champion)

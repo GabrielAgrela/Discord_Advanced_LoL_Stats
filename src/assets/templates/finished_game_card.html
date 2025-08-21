@@ -648,19 +648,19 @@
                             </div>
                             {% endif %}
                             {% if player.built_items or player.arena_augments %}
-                            <div style="position:absolute; right: 12px; bottom: 10px; z-index: 4;">
+                            <div style="position:absolute; right: 12px; bottom: 8px; z-index: 4;">
                                 <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
                                     {% if player.arena_augments %}
-                                    <div class="augment-row" style="display:flex; align-items:center; gap:6px; padding:3px 5px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+                                    <div class="augment-row" style="display:flex; align-items:center; gap:4px; padding:2px 4px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
                                         {% for aug in player.arena_augments %}
-                                        <img src="data:image/png;base64,{{ aug }}" alt="Augment" style="width:22px; height:22px; border-radius:4px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 1px 4px rgba(0,0,0,0.35); background: rgba(0,0,0,0.25);">
+                                        <img src="data:image/png;base64,{{ aug }}" alt="Augment" style="width:26px; height:26px; border-radius:4px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 1px 4px rgba(0,0,0,0.35); background: rgba(0,0,0,0.25);">
                                         {% endfor %}
                                     </div>
                                     {% endif %}
                                     {% if player.built_items %}
-                                    <div class="items-row" style="display:flex; align-items:center; gap:6px; padding:4px 6px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+                                    <div class="items-row" style="display:flex; align-items:center; gap:5px; padding:3px 5px; background: rgba(0,0,0,0.55); border:1px solid rgba(229,193,0,0.25); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
                                         {% for item in player.built_items %}
-                                        <img src="data:image/png;base64,{{ item }}" alt="Item" style="width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 2px 6px rgba(0,0,0,0.4); background: rgba(0,0,0,0.25);">
+                                        <img src="data:image/png;base64,{{ item }}" alt="Item" style="width:26px; height:26px; border-radius:6px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 2px 6px rgba(0,0,0,0.4); background: rgba(0,0,0,0.25);">
                                         {% endfor %}
                                     </div>
                                     {% endif %}

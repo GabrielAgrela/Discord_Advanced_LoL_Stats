@@ -18,6 +18,7 @@ class CardGenerator(commands.Cog):
         self.bot = bot
         self.template_path = "/app/src/assets/templates"
         self.assets_path = "/app/src/assets"
+        self._arena_augment_icon_cache = {}  # id -> base64
         
         # Define gamemode color themes
         self.gamemode_themes = {
@@ -156,6 +157,37 @@ class CardGenerator(commands.Cog):
             
         # If all else fails, raise an error
         raise ValueError(f"Could not find champion image for {champion_name} in {image_type} and fallback to Zed failed")
+
+
+    async def _load_arena_augment_icon(self, augment_id: int, latest_patch: str) -> str | None:
+        """Return base64 icon for an Arena augment id. Try local numeric icons first, then CommunityDragon mapping."""
+
+        # 2) CommunityDragon mapping
+        riot_ops = self.bot.get_cog("RiotAPIOperations")
+        if riot_ops:
+            await riot_ops.ensure_arena_augments_map()
+        icon_base = None
+        try:
+            icon_base = riot_ops.arena_augments_map.get(int(augment_id)) if riot_ops and riot_ops.arena_augments_map else None
+        except Exception:
+            icon_base = None
+        if not icon_base:
+            return None
+
+        # Build small icon URL
+        import aiohttp
+        icon_name = icon_base
+        icon_url = f"https://raw.communitydragon.org/latest/game/assets/ux/cherry/augments/icons/{icon_name}"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(icon_url, timeout=10) as resp:
+                    if resp.status == 200:
+                        content = await resp.read()
+                        return base64.b64encode(content).decode("utf-8")
+        except Exception:
+            return None
+        return None
 
     async def generate_player_card(self, summoner_name: str, gamemode: str, data: List[PlayerStats]) -> disnake.File:
         """Generate a player card as an image file"""
@@ -548,8 +580,8 @@ class CardGenerator(commands.Cog):
                     latest_patch = "15.1.1"
 
                 items_b64 = []
-                # item0..item5 are inventory items, item6 is trinket
-                for i in range(0, 7):
+                # item0..item5 are inventory items; item6 is trinket (exclude)
+                for i in range(0, 6):
                     item_id = int(p.get(f'item{i}', 0) or 0)
                     if item_id <= 0:
                         continue
@@ -572,15 +604,16 @@ class CardGenerator(commands.Cog):
                     aug_id = int(p.get(f'player_augment{i}', 0) or 0)
                     if aug_id <= 0:
                         continue
-                    aug_path = os.path.join(
-                        self.assets_path, "gamedata", latest_patch, "img", "tft-arena", f"{aug_id}.png"
-                    )
-                    try:
-                        if os.path.exists(aug_path):
-                            with open(aug_path, "rb") as img_file:
-                                augments_b64.append(base64.b64encode(img_file.read()).decode('utf-8'))
-                    except Exception:
+                    # Cache per augment id across players in this render
+                    cache_hit = self._arena_augment_icon_cache.get(aug_id)
+                    if cache_hit:
+                        augments_b64.append(cache_hit)
                         continue
+                    # Try local numeric, then CommunityDragon
+                    icon_b64 = await self._load_arena_augment_icon(aug_id, latest_patch)
+                    if icon_b64:
+                        self._arena_augment_icon_cache[aug_id] = icon_b64
+                        augments_b64.append(icon_b64)
                 if augments_b64:
                     p['arena_augments'] = augments_b64
                 

@@ -20,6 +20,8 @@ class RiotAPIOperations(commands.Cog):
         self.MATCH_REGION = match_region
         self.rate_limiter = self.RateLimiter()
         self.bot = bot
+        # Lazy-loaded CommunityDragon Arena (Cherry) augment id -> icon base mapping
+        self.arena_augments_map: Optional[Dict[int, str]] = None
 
     class RateLimiter:
         def __init__(self):
@@ -122,6 +124,63 @@ class RiotAPIOperations(commands.Cog):
                     raise
             
             return None
+
+    async def ensure_arena_augments_map(self) -> None:
+        """Ensure CommunityDragon Arena augment mapping is loaded into memory.
+
+        Populates self.arena_augments_map as {augment_id: icon_basename}.
+        Does nothing if already loaded. Safe to call multiple times.
+        """
+        # if empty, load from CDragon
+        if self.arena_augments_map is not None and len(self.arena_augments_map) > 0:
+            return
+        
+        url = "https://raw.communitydragon.org/latest/cdragon/arena/en_us.json"
+        mapping: Dict[int, str] = {}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status != 200:
+                        self.arena_augments_map = {}
+                        return
+                    data = await resp.json()
+        except Exception as e:
+            print(f"Failed to fetch Arena augments mapping from CDragon: {e}")
+            self.arena_augments_map = {}
+            return
+
+        # Normalize structure to a list of entries
+        entries: List[Dict[str, Any]] = []
+        if isinstance(data, list):
+            entries = data
+        elif isinstance(data, dict):
+            for key in ["augments", "data", "entries", "items"]:
+                if key in data and isinstance(data[key], list):
+                    entries = data[key]
+                    break
+            if not entries:
+                for v in data.values():
+                    if isinstance(v, list):
+                        entries.extend(v)
+
+        import os
+        for e in entries:
+            try:
+                eid_raw = e.get("id")
+                if eid_raw is None:
+                    continue
+                eid = int(eid_raw) if isinstance(eid_raw, (int, str)) and str(eid_raw).isdigit() else None
+                icon = e.get("iconLarge") or e.get("iconPath") or e.get("icon_path")
+                #  icon is assets/ux/cherry/augments/icons/xx.png but should be xx_small.png
+                if icon:
+                    icon = icon.replace("assets/ux/cherry/augments/icons/", "")
+                if eid is None or not icon:
+                    continue
+                mapping[eid] = icon
+            except Exception:
+                continue
+
+        self.arena_augments_map = mapping
 
     async def get_acc_from_riot_id(self, game_name: str, tag_line: str) -> Optional[Dict[str, Any]]:
         """
@@ -587,4 +646,3 @@ class RiotAPIOperations(commands.Cog):
 
 def setup(bot):
     bot.add_cog(RiotAPIOperations(bot))
-

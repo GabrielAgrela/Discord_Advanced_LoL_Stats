@@ -341,6 +341,16 @@ class CardGenerator(commands.Cog):
             # Get the first player's gamemode for theming
             gamemode = players[0]['gameMode']
             theme = self.gamemode_themes.get(gamemode, self.gamemode_themes['CLASSIC'])
+            # Prepare display strings
+            gamemode_display = translate(gamemode)
+            queue_name = None
+            try:
+                if gamemode == 'RUBY' and players and isinstance(players[0], dict):
+                    qname = players[0].get('queue_name')
+                    if qname and isinstance(qname, str):
+                        queue_name = qname
+            except Exception:
+                pass
 
             # Find latest patch folder for profile icons
             gamedata_path = os.path.join(self.assets_path, "gamedata")
@@ -427,12 +437,15 @@ class CardGenerator(commands.Cog):
                 background_image = None
 
             # Render template
+            is_doom_bots = gamemode == 'RUBY'
             html_content = template.render(
                 players=players,
-                gamemode=translate(gamemode),
+                gamemode=gamemode_display,
+                queue_name=queue_name,
                 theme=theme,
                 background_image=background_image,
-                is_arena=is_arena
+                is_arena=is_arena,
+                is_doom_bots=is_doom_bots
             )
 
             # Set content and wait for it to load
@@ -472,7 +485,12 @@ class CardGenerator(commands.Cog):
         if not match_info:
             raise ValueError(f"Match with game_id {game_id} not found in database")
         
-        gamemode, game_duration, game_end, game_creation = match_info
+        # Unpack with backward compatibility if tuple length varies
+        gamemode = match_info[0]
+        game_duration = match_info[1]
+        game_end = match_info[2]
+        game_creation = match_info[3] if len(match_info) >= 4 else None
+        queue_id = match_info[4] if len(match_info) >= 5 else None
         
         # Get all participants data
         participants = await db_ops.get_match_participants(game_id)
@@ -843,21 +861,10 @@ class CardGenerator(commands.Cog):
         minutes = game_duration // 60
         seconds = game_duration % 60
         formatted_duration = f"{minutes}:{seconds:02d}"
-        
-        # Define gamemode-based background images
-        gamemode_backgrounds = {
-            "CLASSIC": "CLASSIC.png",
-            "ARAM": "ARAM.png",
-            "URF": "URF.png",
-            "CHERRY": "CHERRY.png",
-            "ARENA": "CHERRY.png",
-            "NEXUSBLITZ": "NEXUSBLITZ.png",
-            "SWIFTPLAY": "SWIFTPLAY.png",
-            "STRAWBERRY": "STRAWBERRY.png"
-        }
+    
         
         # Default to Summoner's Rift if gamemode not found
-        background_file = gamemode_backgrounds.get(gamemode, "CLASSIC.png")
+        background_file = gamemode+".png";
         background_path = os.path.join(self.assets_path, "images", background_file)
         
         # Read and encode background image
@@ -876,6 +883,15 @@ class CardGenerator(commands.Cog):
             'overlay_end': 'rgba(24, 31, 22, 0.95)'
         })
         
+        # Resolve queue display name for header (e.g., Doom Bots - Hard for RUBY)
+        queue_name = None
+        try:
+            if gamemode == 'RUBY' and riot_ops and queue_id is not None:
+                await riot_ops.ensure_queues_map()
+                queue_name = riot_ops.get_queue_name_from_cache(queue_id)
+        except Exception:
+            queue_name = None
+
         # List to store individual player cards
         player_cards = []
         
@@ -909,6 +925,7 @@ class CardGenerator(commands.Cog):
                         team2_damage=team2_damage or 0,
                         gamemode=gamemode or "Unknown",
                         gamemode_display=translate(gamemode or "Unknown"),
+                        queue_name=queue_name,
                         game_duration=formatted_duration,
                         background_image=background_image,
                         theme=theme

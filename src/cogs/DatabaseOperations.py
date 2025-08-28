@@ -942,12 +942,12 @@ class DatabaseOperations(commands.Cog):
             match_id: The match ID to retrieve
             
         Returns:
-            Tuple containing (game_mode, game_duration, game_end)
+            Tuple containing (game_mode, game_duration, game_end, game_creation, queue_id)
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT game_mode, game_duration, game_end, game_creation
+            SELECT game_mode, game_duration, game_end, game_creation, queue_id
             FROM matches
             WHERE match_id = ?
         ''', (match_id,))

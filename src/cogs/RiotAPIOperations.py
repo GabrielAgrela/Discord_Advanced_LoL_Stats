@@ -22,6 +22,8 @@ class RiotAPIOperations(commands.Cog):
         self.bot = bot
         # Lazy-loaded CommunityDragon Arena (Cherry) augment id -> icon base mapping
         self.arena_augments_map: Optional[Dict[int, str]] = None
+        # Lazy-loaded CommunityDragon queues map id -> queue entry
+        self.queues_map: Optional[Dict[int, Dict[str, Any]]] = None
 
     class RateLimiter:
         def __init__(self):
@@ -181,6 +183,50 @@ class RiotAPIOperations(commands.Cog):
                 continue
 
         self.arena_augments_map = mapping
+
+    async def ensure_queues_map(self) -> None:
+        """Ensure CDragon queues mapping is loaded. Maps queue id -> queue entry."""
+        # Already loaded
+        if isinstance(self.queues_map, dict) and self.queues_map:
+            return
+        url = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/queues.json"
+        mapping: Dict[int, Dict[str, Any]] = {}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status != 200:
+                        self.queues_map = {}
+                        return
+                    data = await resp.json()
+        except Exception as e:
+            print(f"Failed to fetch queues mapping from CDragon: {e}")
+            self.queues_map = {}
+            return
+
+        try:
+            if isinstance(data, list):
+                for entry in data:
+                    try:
+                        qid = int(entry.get("id")) if entry and entry.get("id") is not None else None
+                    except Exception:
+                        qid = None
+                    if qid is None:
+                        continue
+                    mapping[qid] = entry
+        except Exception:
+            mapping = {}
+        self.queues_map = mapping
+
+    def get_queue_name_from_cache(self, queue_id: int) -> Optional[str]:
+        """Return a human-readable queue name from cached CDragon queues, if available."""
+        try:
+            q = self.queues_map.get(int(queue_id)) if self.queues_map else None
+            if not q:
+                return None
+            # Prefer 'name', fall back to 'shortName' or 'description'
+            return q.get("name") or q.get("shortName") or q.get("description")
+        except Exception:
+            return None
 
     async def get_acc_from_riot_id(self, game_name: str, tag_line: str) -> Optional[Dict[str, Any]]:
         """

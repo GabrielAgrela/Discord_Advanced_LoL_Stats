@@ -79,10 +79,23 @@ class Loops(commands.Cog):
                             
                             # Initialize game data if not exists
                             if game_id not in games_data:
+                                # If RUBY, attempt to resolve queue name via CDragon using gameQueueConfigId
+                                resolved_queue_name = None
+                                try:
+                                    if game_data.get('gameMode') == 'RUBY':
+                                        queue_id = game_data.get('gameQueueConfigId')
+                                        riot_ops = self.bot.get_cog("RiotAPIOperations")
+                                        if riot_ops and queue_id is not None:
+                                            await riot_ops.ensure_queues_map()
+                                            resolved_queue_name = riot_ops.get_queue_name_from_cache(queue_id)
+                                except Exception as _e:
+                                    resolved_queue_name = None
+
                                 games_data[game_id] = {
                                     'players': [],
                                     'gameMode': game_data['gameMode'],
-                                    'guild_id': user.guild_id
+                                    'guild_id': user.guild_id,
+                                    'queue_name': resolved_queue_name
                                 }
 
                             # Process all tracked users in this game
@@ -104,6 +117,7 @@ class Loops(commands.Cog):
                                             'name': tracked_user.riot_id_game_name,
                                             'champion': champion,
                                             'gameMode': game_data['gameMode'],
+                                            'queue_name': games_data[game_id].get('queue_name'),
                                             'stats': stats[0] if stats else None,
                                             'guild_id': tracked_user.guild_id,
                                             'game_id': game_id
@@ -484,4 +498,3 @@ class Loops(commands.Cog):
 
 def setup(bot):
     bot.add_cog(Loops(bot))
-

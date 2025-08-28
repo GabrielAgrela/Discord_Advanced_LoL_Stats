@@ -118,6 +118,7 @@
             font-weight: 800;
             color: var(--elder-gold);
         }
+        
         .game-info {
             display: flex;
             justify-content: center;
@@ -213,9 +214,9 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         .item-icon {
-            width: 26px;
-            height: 26px;
-            border-radius: 6px;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.18);
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             background: rgba(0,0,0,0.25);
@@ -229,21 +230,29 @@
             margin-right: 15px;
             z-index: 2;
         }
+        /* Ensure the summoner icon centers within the column (no side margin) */
+        .icon-and-augments .summoner-icon {
+            margin-right: 0;
+        }
         .augment-grid {
             display: grid;
-            grid-template-columns: repeat(2, 26px);
-            grid-auto-rows: 26px;
-            gap: 4px;
-            padding: 4px;
+            grid-template-columns: repeat(2, 30px);
+            grid-auto-rows: 30px;
+            gap: 6px;
+            padding: 6px;
+            /* Match summoner icon outer width (80px + 2px border on each side = 84px) */
+            width: 84px;
+            box-sizing: border-box;
+            justify-content: center;
             background: rgba(0,0,0,0.55);
             border: 1px solid rgba(229,193,0,0.25);
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         .augment-icon {
-            width: 26px;
-            height: 26px;
-            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
             border: 1px solid rgba(255,255,255,0.18);
             box-shadow: 0 1px 4px rgba(0,0,0,0.35);
             background: rgba(0,0,0,0.25);
@@ -648,7 +657,7 @@
     <div class="content">
         <div class="card">
             <div class="card-header">
-                <h2>{{ gamemode_display or gamemode }} Match Insights</h2>
+                <h2>{{ queue_name or gamemode_display or gamemode }}{% if gamemode == 'RUBY' %} -{% endif %} Match Insights</h2>
                 <div class="game-info">
                     <div class="info-item">
                         <i class="fas fa-clock"></i>

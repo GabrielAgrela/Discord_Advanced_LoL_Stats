@@ -14,6 +14,8 @@ def translate(text: str) -> str:
             return "Nexus Blitz"
         elif text == "STRAWBERRY":
             return "Swarm"
+        elif text == "RUBY":
+            return "Doom Bots"
         elif text == "Wukong":
             return "MonkeyKing"
         
@@ -34,4 +36,6 @@ def translate(text: str) -> str:
             return "ARAM"
         elif text == "MonkeyKing":
             return "Wukong"
+        elif text == "Doom Bots":
+            return "RUBY"
         return text

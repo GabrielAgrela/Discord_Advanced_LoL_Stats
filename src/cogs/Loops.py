@@ -180,9 +180,10 @@ class Loops(commands.Cog):
                         message = await channel.fetch_message(message_info['message_id'])
                         
                         game_mode_finished = message_info.get('game_mode') # Get game_mode
-                        #if cherry skip
-                        if game_mode_finished == 'CHERRY':
-                            print(f"Skipping deletion for CHERRY game {game_id}")
+                        game_mode_finished_upper = str(game_mode_finished).upper()
+                        # Skip unsupported special modes
+                        if game_mode_finished_upper in {'CHERRY', 'KIWI'}:
+                            print(f"Skipping deletion for {game_mode_finished_upper} game {game_id}")
                             continue
                         skip_deletion = False  # Flag to control message deletion
 
@@ -196,7 +197,7 @@ class Loops(commands.Cog):
                         update_result = 0 
                         description_for_next_step = ""
 
-                        if game_mode_finished != 'BRAWL':
+                        if game_mode_finished_upper != 'BRAWL':
                             # First update database with new match data and wait for it to complete
                             # This is crucial - we need to await this call to ensure the database is updated
                             # Pass the current game_id to exclude it from being processed as a new match
@@ -271,7 +272,7 @@ class Loops(commands.Cog):
                                     for p in match_participants if p['puuid'] in tracked_puuids
                                 ]
 
-                                if game_mode_finished == "CUSTOM":
+                                if game_mode_finished_upper == "CUSTOM":
                                     await message.edit(embed=disnake.Embed(
                                         title="🎮 Custom Game Over",
                                         description="Stats generation skipped for custom games.",
@@ -279,7 +280,7 @@ class Loops(commands.Cog):
                                     ))
                                     # No summary or cards for CUSTOM games.
 
-                                elif game_mode_finished == "BRAWL":
+                                elif game_mode_finished_upper == "BRAWL":
                                     await message.edit(embed=disnake.Embed(
                                         title="🎮 BRAWL Game Over",
                                         description="Database update and player card generation skipped for BRAWL games.",
@@ -327,8 +328,9 @@ class Loops(commands.Cog):
                             players.sort(key=lambda x: x['stats'].winrate if x['stats'] else 0, reverse=True)
 
                             # Skip generating live cards for unsupported BRAWL mode
-                            if game_info.get('gameMode') == 'BRAWL':
-                                print(f"Skipping live game card generation for BRAWL game {game_id}")
+                            game_mode_upper = str(game_info.get('gameMode', '')).upper()
+                            if game_mode_upper in {'BRAWL', 'KIWI'}:
+                                print(f"Skipping live game card generation for {game_mode_upper} game {game_id}")
                                 continue
                              
                             # Find the botlol channel
@@ -351,7 +353,7 @@ class Loops(commands.Cog):
                                     # Edit the message with the card
                                     await message.edit(embed=None, file=card)
 
-                                    if game_info.get('gameMode') == 'CHERRY':
+                                    if game_mode_upper in {'CHERRY', 'KIWI'}:
                                         match_region = self.bot.get_cog("RiotAPIOperations").ACCOUNT_REGION.upper()
                                         full_game_id = f"{match_region}_{game_id}" if not game_id.startswith(f"{match_region}_") else game_id
                                         
@@ -360,25 +362,25 @@ class Loops(commands.Cog):
                                             
                                             # Add to pending matches
                                             await self.bot.get_cog("DatabaseOperations").add_pending_match(
-                                                full_game_id, 'CHERRY', channel.id, message.id
+                                                full_game_id, game_mode_upper, channel.id, message.id
                                             )
-                                            print(f"Successfully queued live CHERRY match: {full_game_id}")
+                                            print(f"Successfully queued live {game_mode_upper} match: {full_game_id}")
                                             
                                             # Store message info for cleanup (but don't generate live card)
                                             self.live_game_messages[game_id] = {
                                                 'message_id': message.id,
                                                 'channel_id': channel.id,
-                                                'game_mode': game_info['gameMode'],
+                                                'game_mode': game_mode_upper,
                                                 'last_seen_active': time.time(),
                                             }
                                         else:
-                                            print(f"CHERRY match {full_game_id} already in pending queue, skipping")
+                                            print(f"{game_mode_upper} match {full_game_id} already in pending queue, skipping")
                                     
                                     # Store the message info for later cleanup
                                     self.live_game_messages[game_id] = {
                                         'message_id': message.id,
                                         'channel_id': channel.id,
-                                        'game_mode': game_info['gameMode'],
+                                        'game_mode': game_mode_upper,
                                         'last_seen_active': time.time(),
                                     }
                 
@@ -388,7 +390,7 @@ class Loops(commands.Cog):
             await asyncio.sleep(60)
 
     async def process_pending_matches(self):
-        """Periodically process pending CHERRY matches that failed to fetch initially"""
+        """Periodically process pending special-mode matches that failed to fetch initially"""
         await self.bot.wait_until_ready()
         max_attempts = 20
         
@@ -402,6 +404,7 @@ class Loops(commands.Cog):
                 
                 for match_data in pending_matches:
                     match_id, game_mode, channel_id, message_id, attempts, created_at, last_attempt = match_data
+                    game_mode_upper = str(game_mode).upper()
                     print(f"Processing pending match {match_id} (attempt {attempts + 1}) with message ID {message_id} in channel {channel_id}")
                     
                     try:
@@ -464,7 +467,7 @@ class Loops(commands.Cog):
                                 # Remove from pending queue
                                 await self.bot.get_cog("DatabaseOperations").remove_pending_match(match_id)
                                 
-                                print(f"Successfully processed pending CHERRY match: {match_id}")
+                                print(f"Successfully processed pending {game_mode_upper} match: {match_id}")
                                 
                             except disnake.NotFound:
                                 # Message or channel was deleted, remove from queue
@@ -482,18 +485,18 @@ class Loops(commands.Cog):
                                     channel = await self.bot.fetch_channel(channel_id)
                                     message = await channel.fetch_message(message_id)
                                     
-                                    # Validate that this is actually a CHERRY match queued message
+                                    # Validate that this is actually a queued special-mode message
                                     is_valid_queued_message = (
                                         message.embeds and 
                                         len(message.embeds) > 0 and 
                                         message.embeds[0].title and
-                                        ("CHERRY Match Queued" in message.embeds[0].title or 
-                                         "CHERRY Match Found" in message.embeds[0].title)
+                                        (f"{game_mode_upper} Match Queued" in message.embeds[0].title or 
+                                         f"{game_mode_upper} Match Found" in message.embeds[0].title)
                                     )
                                     
                                     if is_valid_queued_message:
                                         failure_embed = disnake.Embed(
-                                            title="❌ CHERRY Match Processing Failed",
+                                            title=f"❌ {game_mode_upper} Match Processing Failed",
                                             description=f"Match {match_id} could not be processed after multiple attempts.\nThis may be due to API limitations or the match being unavailable.",
                                             color=disnake.Color.red()
                                         )
@@ -502,9 +505,9 @@ class Loops(commands.Cog):
                                         # Delete message after a delay
                                         await asyncio.sleep(10)
                                         await message.delete()
-                                        print(f"Deleted failed CHERRY match message for {match_id}")
+                                        print(f"Deleted failed {game_mode_upper} match message for {match_id}")
                                     else:
-                                        print(f"Warning: Message {message_id} for failed match {match_id} doesn't appear to be a CHERRY queued message. Skipping deletion.")
+                                        print(f"Warning: Message {message_id} for failed match {match_id} doesn't appear to be a {game_mode_upper} queued message. Skipping deletion.")
                                     
                                 except disnake.NotFound:
                                     print(f"Message for failed match {match_id} was already deleted")

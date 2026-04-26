@@ -1,7 +1,7 @@
 from disnake.ext import commands
 import disnake
 import asyncio
-from typing import List, Optional, Tuple
+from typing import List
 from ..models.models import User, PlayerStats, PlayerFriendStats
 from ..Utils import translate
 
@@ -126,6 +126,122 @@ class Commands(commands.Cog):
         except Exception as e:
             await inter.followup.send(f"Some error occurred: {e}")
             await self.bot.get_channel(self.bot.botlol_channel_id).send(f"Error in get_player_stats: {e}")
+
+    @commands.slash_command()
+    async def get_overwatch_stats(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        player: str = commands.Param(description="BattleTag (e.g., Player#1234) or username"),
+        gamemode: str = commands.Param(
+            default="all",
+            choices=["all", "competitive", "quickplay"],
+            description="Filter by game mode"
+        ),
+        platform: str = commands.Param(
+            default="all",
+            choices=["all", "pc", "console"],
+            description="Filter by platform"
+        ),
+        champion: str = commands.Param(
+            default=None,
+            description="Optional hero filter (e.g. Ana, Soldier-76, DVa)"
+        ),
+    ):
+        """
+        Get Overwatch stats for a player
+
+        Parameters
+        ----------
+        player: BattleTag (Player#1234) or username
+        gamemode: all, competitive, or quickplay
+        platform: all, pc, or console
+        champion: Optional hero filter
+        """
+        await inter.response.defer()
+        try:
+            overwatch_ops = self.bot.get_cog("OverwatchAPIOperations")
+            card_generator = self.bot.get_cog("CardGenerator")
+            if not overwatch_ops:
+                await inter.followup.send(
+                    embed=disnake.Embed(
+                        title="Overwatch Stats Error",
+                        description="Overwatch module is not loaded.",
+                        color=disnake.Color.red()
+                    )
+                )
+                return
+
+            if not card_generator:
+                await inter.followup.send(
+                    embed=disnake.Embed(
+                        title="Overwatch Stats Error",
+                        description="Card generator module is not loaded.",
+                        color=disnake.Color.red()
+                    )
+                )
+                return
+
+            gamemode_filter = None if gamemode == "all" else gamemode
+            platform_filter = None if platform == "all" else platform
+            champion_filter = champion.strip() if champion else None
+            if champion_filter == "":
+                champion_filter = None
+
+            result = await asyncio.wait_for(
+                overwatch_ops.resolve_player_and_stats(
+                    player_query=player,
+                    gamemode=gamemode_filter,
+                    platform=platform_filter
+                ),
+                timeout=20.0
+            )
+
+            error = result.get("error")
+            if error:
+                await inter.followup.send(
+                    embed=disnake.Embed(
+                        title="Overwatch Stats Error",
+                        description=error,
+                        color=disnake.Color.red()
+                    )
+                )
+                return
+
+            summary = result.get("summary") or {}
+            search_match = result.get("search_match") or {}
+
+            # Normalize summary fields with search fallbacks for card rendering.
+            if not summary.get("username"):
+                summary["username"] = search_match.get("name") or player
+            if not summary.get("avatar"):
+                summary["avatar"] = search_match.get("avatar")
+            if not summary.get("title"):
+                summary["title"] = search_match.get("title")
+            if not summary.get("endorsement"):
+                summary["endorsement"] = {"level": None, "frame": None}
+
+            card_file = await card_generator.generate_overwatch_player_card(
+                player_id=result.get("player_id") or player.replace("#", "-"),
+                summary=summary,
+                stats=result.get("stats"),
+                gamemode=gamemode,
+                platform=platform,
+                champion=champion_filter,
+            )
+            await inter.followup.send(file=card_file)
+        except asyncio.TimeoutError:
+            await inter.followup.send(
+                embed=disnake.Embed(
+                    title="Overwatch Stats Error",
+                    description="Request timed out while fetching Overwatch data. Try again in a moment.",
+                    color=disnake.Color.red()
+                )
+            )
+        except Exception as e:
+            await inter.followup.send(f"Some error occurred: {e}")
+            log_channel = self.bot.get_channel(self.bot.botlol_channel_id) if self.bot.botlol_channel_id else None
+            if log_channel:
+                await log_channel.send(f"Error in get_overwatch_stats: {e}")
 
     @commands.slash_command()
     async def get_all_players_stats(

@@ -11,6 +11,6 @@ services:
       - ./src/database:/app/src/database
     ports:
       - "5678:5678"
-    restart: unless-stopped
+    restart: always
     environment:
       - PYTHONPATH=/app

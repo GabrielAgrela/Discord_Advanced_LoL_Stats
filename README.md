@@ -105,13 +105,14 @@ In VSCode your launch.json should be something like this:
 
 ## Commands
 
-_Note: Most commands must be used within the `#botlol` channel._
+_Note: Most commands must be used within the `#botlol` channel. `/get_overwatch_stats` can be used in any channel._
 
 - `/get_player_stats [summoner_name] [gamemode] [champion] [sort_by] [sort_order]` - Display detailed stats for a summoner (uses autocomplete for summoner name).
   - Supports various game modes: ARAM, Summoner\'s Rift, Arena, Nexus Blitz, Swarm, Ultimate Book, URF
   - Sort options: champion_games, winrate, kda, dpm, time_dead, pentas
   - Optional `champion` parameter filters stats for a specific champion (uses autocomplete).
 - `/get_all_players_stats` - Show stats for all tracked players.
+- `/get_overwatch_stats [player] [gamemode] [platform] [champion]` - Display Overwatch stats for a BattleTag/username; optionally filter to a specific hero.
 - `/compare_players [username1] [username2] [gamemode] [champion]` - Compare two players\' stats (uses autocomplete for usernames). Optional `champion` filter (uses autocomplete).
 - `/player_friends_stats [username]` - View stats when playing with friends (uses autocomplete for username).
 - `/update_database` - Manually update the database with new matches for all players.

@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 import jinja2
 import io
 import base64
-from typing import List
+from typing import Any, Dict, List, Optional
 from PIL import Image, ImageFilter, ImageDraw
 from ..models.models import PlayerStats
 from ..Utils import translate
@@ -19,6 +19,7 @@ class CardGenerator(commands.Cog):
         self.template_path = "/app/src/assets/templates"
         self.assets_path = "/app/src/assets"
         self._arena_augment_icon_cache = {}  # id -> base64
+        self._ow_hero_portraits_cache: Dict[str, str] = {}
         
         # Define gamemode color themes
         self.gamemode_themes = {
@@ -474,6 +475,388 @@ class CardGenerator(commands.Cog):
             
             # Return as discord file
             return disnake.File(fp=io.BytesIO(screenshot), filename='live_players.png')
+
+    @staticmethod
+    def _ow_format_metric(value: Any, decimals: int = 2, suffix: str = "") -> str:
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            return "N/A"
+
+        if decimals <= 0:
+            formatted = f"{numeric_value:,.0f}"
+        else:
+            formatted = f"{numeric_value:,.{decimals}f}"
+        return f"{formatted}{suffix}"
+
+    @staticmethod
+    def _ow_format_time(seconds: Optional[int]) -> str:
+        try:
+            total_seconds = int(seconds) if seconds is not None else None
+        except (TypeError, ValueError):
+            total_seconds = None
+
+        if total_seconds is None:
+            return "N/A"
+
+        total_seconds = max(total_seconds, 0)
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes = remainder // 60
+        return f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+
+    @staticmethod
+    def _ow_normalize_hero_text(text: Any) -> str:
+        if text is None:
+            return ""
+        return "".join(ch.lower() for ch in str(text) if ch.isalnum())
+
+    @staticmethod
+    def _ow_normalize_hero_key(hero_key: Any) -> str:
+        if hero_key is None:
+            return ""
+        return str(hero_key).strip().lower().replace("_", "-").replace(" ", "-")
+
+    async def _ow_get_hero_portrait_map(self) -> Dict[str, str]:
+        """Return cached map hero_key -> portrait_url, fetching once if needed."""
+        if self._ow_hero_portraits_cache:
+            return self._ow_hero_portraits_cache
+
+        portraits: Dict[str, str] = {}
+
+        # Prefer cached hero metadata from OverwatchAPIOperations.
+        ow_ops = self.bot.get_cog("OverwatchAPIOperations") if self.bot else None
+        if ow_ops:
+            try:
+                await ow_ops.ensure_heroes_map()
+                heroes_map = getattr(ow_ops, "heroes_map", None)
+                if isinstance(heroes_map, dict):
+                    for hero_key, hero_payload in heroes_map.items():
+                        if not isinstance(hero_payload, dict):
+                            continue
+                        normalized_key = self._ow_normalize_hero_key(hero_key)
+                        portrait = hero_payload.get("portrait")
+                        if normalized_key and portrait:
+                            portraits[normalized_key] = str(portrait)
+            except Exception:
+                portraits = {}
+
+        # Fallback: fetch directly if cog cache isn't available.
+        if not portraits:
+            try:
+                import aiohttp
+                timeout = aiohttp.ClientTimeout(total=12)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get("https://overfast-api.tekrop.fr/heroes") as response:
+                        if response.status == 200:
+                            payload = await response.json()
+                            if isinstance(payload, list):
+                                for hero in payload:
+                                    if not isinstance(hero, dict):
+                                        continue
+                                    normalized_key = self._ow_normalize_hero_key(hero.get("key"))
+                                    portrait = hero.get("portrait")
+                                    if normalized_key and portrait:
+                                        portraits[normalized_key] = str(portrait)
+            except Exception:
+                portraits = {}
+
+        self._ow_hero_portraits_cache = portraits
+        return self._ow_hero_portraits_cache
+
+    def _ow_build_role_pie(self, roles_data: Optional[Dict[str, Any]]) -> tuple[Optional[str], List[Dict[str, Any]], int]:
+        """Build conic-gradient CSS and legend rows for role distribution."""
+        if not isinstance(roles_data, dict) or not roles_data:
+            return None, [], 0
+
+        ordered_roles = ["tank", "damage", "support", "open"]
+        role_colors = {
+            "tank": "#f2a65a",
+            "damage": "#f06aa3",
+            "support": "#58d7c7",
+            "open": "#7d8fff",
+        }
+
+        role_rows: List[Dict[str, Any]] = []
+        remaining_roles = sorted([key for key in roles_data.keys() if key not in ordered_roles])
+        for role_key in ordered_roles + remaining_roles:
+            role_stats = roles_data.get(role_key)
+            if not isinstance(role_stats, dict):
+                continue
+            games = int(role_stats.get("games_played", 0) or 0)
+            if games <= 0:
+                continue
+            role_rows.append({
+                "key": role_key,
+                "name": role_key.replace("-", " ").title(),
+                "games": games,
+                "color": role_colors.get(role_key, "#9aaec8"),
+            })
+
+        if not role_rows:
+            return None, [], 0
+
+        total_games = sum(row["games"] for row in role_rows)
+        if total_games <= 0:
+            return None, [], 0
+
+        gradient_parts = []
+        legend_rows: List[Dict[str, Any]] = []
+        start_pct = 0.0
+        for index, row in enumerate(role_rows):
+            pct = (row["games"] / total_games) * 100
+            end_pct = 100.0 if index == len(role_rows) - 1 else (start_pct + pct)
+            gradient_parts.append(f"{row['color']} {start_pct:.2f}% {end_pct:.2f}%")
+            legend_rows.append({
+                "name": row["name"],
+                "games": row["games"],
+                "pct": round(pct, 1),
+                "color": row["color"],
+            })
+            start_pct = end_pct
+
+        pie_css = f"conic-gradient({', '.join(gradient_parts)})"
+        return pie_css, legend_rows, total_games
+
+    def _ow_find_hero_match(
+        self,
+        heroes_data: Optional[Dict[str, Any]],
+        champion_query: Optional[str],
+    ) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+        if not isinstance(heroes_data, dict) or not champion_query:
+            return None, None
+
+        query_normalized = self._ow_normalize_hero_text(champion_query)
+        if not query_normalized:
+            return None, None
+
+        exact_matches = []
+        partial_matches = []
+
+        for hero_key, hero_stats in heroes_data.items():
+            if not isinstance(hero_stats, dict):
+                continue
+            key_normalized = self._ow_normalize_hero_text(hero_key)
+            name_normalized = self._ow_normalize_hero_text(str(hero_key).replace("-", " "))
+
+            if query_normalized in (key_normalized, name_normalized):
+                exact_matches.append((hero_key, hero_stats))
+                continue
+
+            if query_normalized in key_normalized or query_normalized in name_normalized:
+                partial_matches.append((hero_key, hero_stats))
+
+        def pick_best(candidates: List[tuple[str, Dict[str, Any]]]) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+            if not candidates:
+                return None, None
+            candidates.sort(
+                key=lambda item: int(item[1].get("games_played", 0) or 0),
+                reverse=True
+            )
+            return candidates[0]
+
+        if exact_matches:
+            return pick_best(exact_matches)
+        if partial_matches:
+            return pick_best(partial_matches)
+        return None, None
+
+    async def generate_overwatch_player_card(
+        self,
+        player_id: str,
+        summary: Dict[str, Any],
+        stats: Optional[Dict[str, Any]],
+        gamemode: str = "all",
+        platform: str = "all",
+        champion: Optional[str] = None,
+    ) -> disnake.File:
+        """Generate an Overwatch player card as an image file."""
+        summary = summary or {}
+        stats = stats or {}
+
+        display_name = summary.get("username") or "Unknown Player"
+        avatar_url = summary.get("avatar")
+        namecard_url = summary.get("namecard")
+        player_title = summary.get("title")
+        endorsement = summary.get("endorsement") if isinstance(summary.get("endorsement"), dict) else {}
+        endorsement_level = endorsement.get("level")
+        endorsement_frame = endorsement.get("frame")
+
+        mode_label = "Quickplay + Competitive" if gamemode == "all" else gamemode.title()
+        platform_label = "All Platforms" if platform == "all" else platform.upper()
+        hero_portrait_map = await self._ow_get_hero_portrait_map()
+
+        heroes_data = stats.get("heroes") if isinstance(stats, dict) else None
+        matched_hero_key = None
+        matched_hero_stats = None
+        hero_filter_name = None
+
+        if champion:
+            matched_hero_key, matched_hero_stats = self._ow_find_hero_match(heroes_data, champion)
+            if not matched_hero_stats:
+                available = []
+                if isinstance(heroes_data, dict):
+                    available = [str(hero).replace("-", " ").title() for hero in heroes_data.keys()]
+                    available.sort()
+                if available:
+                    preview = ", ".join(available[:12])
+                    raise ValueError(
+                        f"Could not find hero `{champion}` for this player/filter. "
+                        f"Some available heroes: {preview}"
+                    )
+                raise ValueError(f"Could not find hero `{champion}` for this player/filter.")
+            hero_filter_name = str(matched_hero_key).replace("-", " ").title()
+
+        if matched_hero_stats:
+            general = matched_hero_stats
+        else:
+            general = stats.get("general") if isinstance(stats, dict) else None
+
+        has_general_stats = isinstance(general, dict)
+        average = general.get("average", {}) if has_general_stats else {}
+        stats_scope_label = f"For {hero_filter_name}" if hero_filter_name else "Across selected filter"
+
+        games_played = int(general.get("games_played", 0) or 0) if has_general_stats else 0
+        games_won = int(general.get("games_won", 0) or 0) if has_general_stats else 0
+        games_lost = int(general.get("games_lost", 0) or 0) if has_general_stats else 0
+        winrate = self._ow_format_metric(general.get("winrate"), 1, "%") if has_general_stats else "N/A"
+        kda = self._ow_format_metric(general.get("kda"), 2) if has_general_stats else "N/A"
+        time_played = self._ow_format_time(general.get("time_played")) if has_general_stats else "N/A"
+        avg_damage = self._ow_format_metric(average.get("damage"), 0) if has_general_stats else "N/A"
+        avg_healing = self._ow_format_metric(average.get("healing"), 0) if has_general_stats else "N/A"
+        avg_elims = self._ow_format_metric(average.get("eliminations"), 2) if has_general_stats else "N/A"
+        avg_deaths = self._ow_format_metric(average.get("deaths"), 2) if has_general_stats else "N/A"
+
+        roles_data = stats.get("roles") if isinstance(stats, dict) and not hero_filter_name else None
+        role_pie_css = None
+        role_legend: List[Dict[str, Any]] = []
+        role_total_games = 0
+        if roles_data:
+            role_pie_css, role_legend, role_total_games = self._ow_build_role_pie(roles_data)
+        roles = []
+        if isinstance(roles_data, dict):
+            ordered_roles = ["tank", "damage", "support", "open"]
+            remaining_roles = sorted([key for key in roles_data.keys() if key not in ordered_roles])
+            for role_key in ordered_roles + remaining_roles:
+                role_stats = roles_data.get(role_key)
+                if not isinstance(role_stats, dict):
+                    continue
+                role_games = int(role_stats.get("games_played", 0) or 0)
+                if role_games <= 0:
+                    continue
+                roles.append({
+                    "name": role_key.replace("-", " ").title(),
+                    "games": role_games,
+                    "winrate": self._ow_format_metric(role_stats.get("winrate"), 1, "%"),
+                    "kda": self._ow_format_metric(role_stats.get("kda"), 2),
+                })
+
+        top_heroes = []
+        if matched_hero_key and isinstance(matched_hero_stats, dict):
+            normalized_key = self._ow_normalize_hero_key(matched_hero_key)
+            top_heroes = [{
+                "name": str(matched_hero_key).replace("-", " ").title(),
+                "games": int(matched_hero_stats.get("games_played", 0) or 0),
+                "winrate": self._ow_format_metric(matched_hero_stats.get("winrate"), 1, "%"),
+                "kda": self._ow_format_metric(matched_hero_stats.get("kda"), 2),
+                "time_played": self._ow_format_time(matched_hero_stats.get("time_played")),
+                "portrait_url": hero_portrait_map.get(normalized_key),
+            }]
+        elif isinstance(heroes_data, dict):
+            def _sortable_winrate(raw_value: Any) -> float:
+                try:
+                    return float(raw_value)
+                except (TypeError, ValueError):
+                    return -1.0
+
+            for hero_key, hero_stats in heroes_data.items():
+                if not isinstance(hero_stats, dict):
+                    continue
+                hero_games = int(hero_stats.get("games_played", 0) or 0)
+                if hero_games <= 0:
+                    continue
+                top_heroes.append({
+                    "name": str(hero_key).replace("-", " ").title(),
+                    "hero_key": hero_key,
+                    "games": hero_games,
+                    "winrate": hero_stats.get("winrate"),
+                    "kda": hero_stats.get("kda"),
+                    "time_played": hero_stats.get("time_played"),
+                })
+            top_heroes.sort(
+                key=lambda item: (
+                    item.get("games", 0),
+                    _sortable_winrate(item.get("winrate")),
+                ),
+                reverse=True,
+            )
+            top_heroes = [
+                {
+                    "name": hero["name"],
+                    "games": hero["games"],
+                    "winrate": self._ow_format_metric(hero.get("winrate"), 1, "%"),
+                    "kda": self._ow_format_metric(hero.get("kda"), 2),
+                    "time_played": self._ow_format_time(hero.get("time_played")),
+                    "portrait_url": hero_portrait_map.get(self._ow_normalize_hero_key(hero.get("hero_key"))),
+                }
+                for hero in top_heroes[:6]
+            ]
+
+        template = self.jinja_env.get_template("overwatch_player_card.html")
+        # Use only real profile namecard as banner. If unavailable, template falls back to a neutral gradient.
+        header_banner_url = (
+            namecard_url.strip()
+            if isinstance(namecard_url, str) and namecard_url.strip()
+            else None
+        )
+
+        html_content = template.render(
+            display_name=display_name,
+            player_id=player_id,
+            player_title=player_title,
+            avatar_url=avatar_url,
+            namecard_url=namecard_url,
+            header_banner_url=header_banner_url,
+            endorsement_level=endorsement_level,
+            endorsement_frame=endorsement_frame,
+            mode_label=mode_label,
+            platform_label=platform_label,
+            hero_filter_name=hero_filter_name,
+            stats_scope_label=stats_scope_label,
+            has_general_stats=has_general_stats,
+            games_played=games_played,
+            games_won=games_won,
+            games_lost=games_lost,
+            winrate=winrate,
+            kda=kda,
+            time_played=time_played,
+            avg_damage=avg_damage,
+            avg_healing=avg_healing,
+            avg_elims=avg_elims,
+            avg_deaths=avg_deaths,
+            roles=roles,
+            role_pie_css=role_pie_css,
+            role_legend=role_legend,
+            role_total_games=role_total_games,
+            top_heroes=top_heroes,
+        )
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page(viewport={"width": 1180, "height": 760})
+            await page.set_content(html_content)
+            await page.wait_for_load_state("networkidle")
+            await page.wait_for_timeout(500)
+
+            dimensions = await page.evaluate("""() => ({
+                width: document.documentElement.scrollWidth,
+                height: document.documentElement.scrollHeight
+            })""")
+            await page.set_viewport_size(dimensions)
+
+            screenshot = await page.screenshot(type="png", full_page=True)
+            await browser.close()
+
+            return disnake.File(fp=io.BytesIO(screenshot), filename="overwatch_player_card.png")
 
     async def generate_finished_game_card(self, game_id):
         """Generate individual cards for each tracked player in a finished game."""

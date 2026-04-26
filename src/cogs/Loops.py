@@ -15,8 +15,31 @@ class Loops(commands.Cog):
         self.bot.loop.create_task(self.process_pending_matches())
         self.live_game_messages = {}  # Store message IDs for each game
 
+    def _get_cpu_temperature(self):
+        """Best-effort CPU temperature lookup across common sensor labels."""
+        try:
+            temps = psutil.sensors_temperatures(fahrenheit=False)
+        except Exception:
+            return None
+
+        preferred_labels = ("coretemp", "cpu-thermal", "k10temp", "acpitz", "cpu_thermal")
+        for label in preferred_labels:
+            entries = temps.get(label)
+            if not entries:
+                continue
+            valid = [entry.current for entry in entries if entry.current is not None]
+            if valid:
+                return max(valid)
+
+        for entries in temps.values():
+            valid = [entry.current for entry in entries if entry.current is not None]
+            if valid:
+                return max(valid)
+
+        return None
+
     async def update_cpu_status(self):
-        """Updates the bot's status with peak CPU usage every 5 seconds."""
+        """Updates the bot's status with peak CPU usage and temperature every 5 seconds."""
         await self.bot.wait_until_ready()
         # Initialize CPU percent without blocking
         psutil.cpu_percent()
@@ -29,12 +52,18 @@ class Loops(commands.Cog):
                     cpu_percent = psutil.cpu_percent()
                     peak_cpu = max(peak_cpu, cpu_percent)
                     await asyncio.sleep(1)
+
+                cpu_temp = self._get_cpu_temperature()
+                if cpu_temp is None:
+                    status_text = f"CPU {peak_cpu:.1f}%"
+                else:
+                    status_text = f"CPU {peak_cpu:.1f}% | {cpu_temp:.1f}°C"
                 
                 try:
                     await self.bot.change_presence(
                         activity=disnake.Activity(
                             type=disnake.ActivityType.watching,
-                            name=f"CPU Usage: {peak_cpu}%"
+                            name=status_text
                         )
                     )
                 except (ConnectionResetError, disnake.ConnectionClosed):
@@ -82,7 +111,7 @@ class Loops(commands.Cog):
                                 # If RUBY, attempt to resolve queue name via CDragon using gameQueueConfigId
                                 resolved_queue_name = None
                                 try:
-                                    if game_data.get('gameMode') == 'RUBY':
+                                    if 'RUBY' in str(game_data.get('gameMode', '')):
                                         queue_id = game_data.get('gameQueueConfigId')
                                         riot_ops = self.bot.get_cog("RiotAPIOperations")
                                         if riot_ops and queue_id is not None:

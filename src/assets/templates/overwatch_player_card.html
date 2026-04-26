@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overwatch Player Card</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Teko:wght@500;600;700&display=swap');
+
+        :root {
+            --bg-0: #070b12;
+            --bg-1: #0a1220;
+            --panel: #16263b;
+            --panel-soft: #1b2d45;
+            --line: rgba(150, 190, 226, 0.26);
+            --line-soft: rgba(150, 190, 226, 0.14);
+            --text: #eff6ff;
+            --muted: #9db2cb;
+            --orange: #ffad4b;
+            --cyan: #58d4ff;
+            --teal: #5fdbc7;
+            --pink: #f06aa3;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            color: var(--text);
+            font-family: 'Barlow', sans-serif;
+            background:
+                radial-gradient(1200px 520px at 12% -14%, #2a3f61 0%, rgba(42, 63, 97, 0) 62%),
+                radial-gradient(900px 460px at 96% 112%, #423127 0%, rgba(66, 49, 39, 0) 60%),
+                linear-gradient(180deg, var(--bg-0), var(--bg-1));
+        }
+
+        .card {
+            position: relative;
+            width: 1160px;
+            margin: 0 auto;
+            border-radius: 22px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #0f1b2b 0%, #0a1422 100%);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(130deg, rgba(255, 173, 75, 0.09) 0%, rgba(88, 212, 255, 0.06) 38%, rgba(95, 219, 199, 0.04) 70%, rgba(0, 0, 0, 0) 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .header {
+            position: relative;
+            min-height: 252px;
+            border-bottom: 1px solid var(--line-soft);
+            background-image:
+                linear-gradient(102deg, rgba(6, 12, 22, 0.94) 0%, rgba(8, 16, 29, 0.74) 48%, rgba(8, 16, 29, 0.92) 100%),
+                {% if header_banner_url %}
+                    url('{{ header_banner_url }}')
+                {% else %}
+                    radial-gradient(660px 280px at 16% -20%, rgba(105, 147, 209, 0.52), rgba(105, 147, 209, 0)),
+                    radial-gradient(760px 380px at 92% 120%, rgba(255, 166, 72, 0.32), rgba(255, 166, 72, 0)),
+                    linear-gradient(120deg, #1c2f47, #111c2c)
+                {% endif %};
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+        }
+
+        .header::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+            pointer-events: none;
+        }
+
+        .top-right {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            z-index: 3;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 13px;
+            border-radius: 999px;
+            border: 1px solid rgba(187, 214, 244, 0.45);
+            background: rgba(8, 15, 26, 0.68);
+            backdrop-filter: blur(4px);
+            color: #ecf5ff;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.42px;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .chip:nth-child(1) {
+            border-color: rgba(255, 179, 95, 0.68);
+        }
+
+        .chip:nth-child(2) {
+            border-color: rgba(103, 210, 250, 0.62);
+        }
+
+        .chip img {
+            width: 13px;
+            height: 13px;
+            object-fit: contain;
+        }
+
+        .identity-wrap {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 14px;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            gap: 14px;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(173, 206, 240, 0.32);
+            background: linear-gradient(100deg, rgba(10, 18, 30, 0.84), rgba(10, 18, 30, 0.62));
+            backdrop-filter: blur(3px);
+            z-index: 2;
+        }
+
+        .avatar,
+        .avatar-fallback {
+            width: 86px;
+            height: 86px;
+            border-radius: 16px;
+            border: 2px solid rgba(196, 220, 244, 0.3);
+            flex-shrink: 0;
+        }
+
+        .avatar {
+            object-fit: cover;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .avatar-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #ffad4b, #5dd8ff);
+            color: #081320;
+            font-family: 'Teko', sans-serif;
+            font-size: 52px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.4px;
+        }
+
+        .meta {
+            min-width: 0;
+        }
+
+        .name {
+            margin: 0;
+            max-width: 800px;
+            font-family: 'Teko', sans-serif;
+            font-size: 86px;
+            font-weight: 700;
+            line-height: 0.82;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-id {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 26px;
+            font-family: 'Teko', sans-serif;
+            letter-spacing: 0.56px;
+            line-height: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-title {
+            margin-top: 3px;
+            color: #ffd3a8;
+            font-size: 20px;
+            font-family: 'Teko', sans-serif;
+            letter-spacing: 0.74px;
+            text-transform: uppercase;
+            line-height: 0.95;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1.07fr 0.93fr;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .panel {
+            position: relative;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: linear-gradient(180deg, #21344c 0%, #1b2d45 100%);
+            padding: 12px;
+        }
+
+        .panel::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 3px;
+            border-radius: 16px 16px 0 0;
+            background: linear-gradient(90deg, rgba(255, 173, 75, 0.86), rgba(88, 212, 255, 0.54) 42%, rgba(95, 219, 199, 0));
+            pointer-events: none;
+        }
+
+        .section-title,
+        .heroes-title {
+            margin: 0 0 9px;
+            color: #f3f8ff;
+            font-size: 21px;
+            font-family: 'Teko', sans-serif;
+            font-weight: 600;
+            letter-spacing: 1.02px;
+            text-transform: uppercase;
+            line-height: 0.95;
+        }
+
+        .section-title::after,
+        .heroes-title::after {
+            content: "";
+            display: block;
+            width: 82px;
+            height: 2px;
+            margin-top: 6px;
+            background: linear-gradient(90deg, rgba(255, 173, 75, 0.95), rgba(255, 173, 75, 0));
+        }
+
+        .no-stats {
+            margin-bottom: 10px;
+            padding: 9px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 177, 99, 0.46);
+            background: rgba(74, 47, 27, 0.6);
+            color: #ffe8d2;
+            font-size: 12px;
+            line-height: 1.42;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .metric {
+            border-radius: 10px;
+            border: 1px solid rgba(150, 190, 226, 0.24);
+            background: linear-gradient(180deg, rgba(14, 24, 39, 0.56), rgba(14, 24, 39, 0.3));
+            padding: 7px 8px;
+            min-height: 88px;
+        }
+
+        .metric .label {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.58px;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .metric .value {
+            margin-top: 4px;
+            font-family: 'Teko', sans-serif;
+            font-size: 38px;
+            font-weight: 600;
+            line-height: 0.82;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .metric .sub {
+            margin-top: 3px;
+            color: #d1deee;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .role-wrap {
+            display: grid;
+            grid-template-columns: 205px 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .pie {
+            position: relative;
+            width: 178px;
+            height: 178px;
+            margin: 0 auto;
+            border-radius: 50%;
+            border: 3px solid rgba(150, 190, 226, 0.36);
+            box-shadow: inset 0 0 0 1px rgba(8, 13, 22, 0.42);
+        }
+
+        .pie::after {
+            content: "";
+            position: absolute;
+            inset: 44px;
+            border-radius: 50%;
+            border: 1px solid rgba(150, 190, 226, 0.28);
+            background: #17283f;
+        }
+
+        .legend {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .legend-row {
+            display: grid;
+            grid-template-columns: 9px minmax(0, 1fr) auto auto;
+            align-items: center;
+            gap: 8px;
+            border-radius: 9px;
+            border: 1px solid rgba(150, 190, 226, 0.2);
+            background: rgba(13, 22, 36, 0.38);
+            padding: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.22px;
+        }
+
+        .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+        }
+
+        .heroes-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+        }
+
+        .hero-card {
+            position: relative;
+            height: 228px;
+            border-radius: 13px;
+            border: 1px solid rgba(150, 190, 226, 0.26);
+            background: #152437;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 1px rgba(7, 12, 19, 0.4);
+        }
+
+        .hero-image {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #27384d;
+        }
+
+        .hero-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.02);
+        }
+
+        .hero-image::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(7, 13, 23, 0.08) 0%, rgba(7, 13, 23, 0.88) 100%),
+                linear-gradient(90deg, rgba(7, 13, 23, 0.58) 0%, rgba(7, 13, 23, 0.06) 58%);
+            pointer-events: none;
+        }
+
+        .hero-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Teko', sans-serif;
+            font-size: 74px;
+            line-height: 1;
+            color: rgba(238, 246, 255, 0.62);
+            background: linear-gradient(135deg, #445a78, #2a3c56);
+        }
+
+        .hero-rank {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(194, 221, 246, 0.46);
+            background: rgba(6, 11, 20, 0.74);
+            color: #eaf4ff;
+            padding: 4px 7px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.35px;
+            line-height: 1;
+            z-index: 3;
+        }
+
+        .hero-stats {
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            z-index: 3;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            border-radius: 10px;
+            border: 1px solid rgba(178, 211, 241, 0.42);
+            background: rgba(142, 178, 216, 0.3);
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        }
+
+        .hero-stat {
+            padding: 6px 4px 5px;
+            text-align: center;
+            background: rgba(8, 14, 24, 0.72);
+        }
+
+        .hero-stat .k {
+            color: rgba(198, 217, 238, 0.78);
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.44px;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .hero-stat .v {
+            margin-top: 2px;
+            color: #edf5ff;
+            font-family: 'Teko', sans-serif;
+            font-size: 36px;
+            font-weight: 600;
+            line-height: 0.82;
+            letter-spacing: 0.28px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <section class="header">
+            <div class="top-right">
+                <span class="chip">{{ mode_label }}</span>
+                <span class="chip">{{ platform_label }}</span>
+                {% if hero_filter_name %}
+                    <span class="chip">{{ hero_filter_name }}</span>
+                {% endif %}
+                {% if endorsement_level %}
+                    <span class="chip endorsement">
+                        {% if endorsement_frame %}
+                            <img src="{{ endorsement_frame }}" alt="endorsement">
+                        {% endif %}
+                        Endorsement {{ endorsement_level }}
+                    </span>
+                {% endif %}
+            </div>
+
+            <div class="identity-wrap">
+                {% if avatar_url %}
+                    <img class="avatar" src="{{ avatar_url }}" alt="avatar">
+                {% else %}
+                    <div class="avatar-fallback">{{ display_name[:1] }}</div>
+                {% endif %}
+
+                <div class="meta">
+                    <h1 class="name">{{ display_name }}</h1>
+                    <div class="player-id">{{ player_id }}</div>
+                    {% if player_title %}
+                        <div class="player-title">{{ player_title }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="content">
+            <section class="panel">
+                {% if not has_general_stats %}
+                    <div class="no-stats">
+                        No public stats were returned for this filter{% if hero_filter_name %} and hero{% endif %}.
+                        This usually means the profile is private or has no matches in this mode/platform.
+                    </div>
+                {% endif %}
+
+                <h2 class="section-title">Overview</h2>
+                <div class="metric-grid">
+                    <div class="metric"><div class="label">Games</div><div class="value">{{ games_played }}</div><div class="sub">{{ games_won }}W / {{ games_lost }}L</div></div>
+                    <div class="metric"><div class="label">Win Rate</div><div class="value">{{ winrate }}</div><div class="sub">{{ stats_scope_label }}</div></div>
+                    <div class="metric"><div class="label">KDA</div><div class="value">{{ kda }}</div><div class="sub">Average</div></div>
+                    <div class="metric"><div class="label">Time Played</div><div class="value">{{ time_played }}</div><div class="sub">Total</div></div>
+                    <div class="metric"><div class="label">Elims / 10m</div><div class="value">{{ avg_elims }}</div></div>
+                    <div class="metric"><div class="label">Deaths / 10m</div><div class="value">{{ avg_deaths }}</div></div>
+                    <div class="metric"><div class="label">Damage / 10m</div><div class="value">{{ avg_damage }}</div></div>
+                    <div class="metric"><div class="label">Healing / 10m</div><div class="value">{{ avg_healing }}</div></div>
+                </div>
+                <div class="muted" style="margin-top: 2px; margin-bottom: 10px;">
+                    Source: OverFast summary stats (Quickplay + Competitive only).
+                </div>
+
+                <h2 class="section-title">Role Breakdown</h2>
+                {% if hero_filter_name %}
+                    <div class="muted">Hero filter active. Role breakdown is hidden in hero view.</div>
+                {% elif role_pie_css and role_legend %}
+                    <div class="role-wrap">
+                        <div class="pie" style="background: {{ role_pie_css }};"></div>
+                        <div class="legend">
+                            {% for role in role_legend %}
+                                <div class="legend-row">
+                                    <span class="dot" style="background: {{ role.color }};"></span>
+                                    <span>{{ role.name }}</span>
+                                    <span>{{ role.games }}G</span>
+                                    <span>{{ role.pct }}%</span>
+                                </div>
+                            {% endfor %}
+                            <div class="muted">Total role games: {{ role_total_games }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="muted">No role breakdown available.</div>
+                {% endif %}
+            </section>
+
+            <section class="panel">
+                <h2 class="heroes-title">{{ "Selected Hero" if hero_filter_name else "Hero Gallery" }}</h2>
+                {% if top_heroes %}
+                    <div class="heroes-grid">
+                        {% for hero in top_heroes %}
+                            <article class="hero-card">
+                                <div class="hero-image">
+                                    {% if hero.portrait_url %}
+                                        <img src="{{ hero.portrait_url }}" alt="{{ hero.name }}">
+                                    {% else %}
+                                        <div class="hero-fallback">{{ hero.name[:1] }}</div>
+                                    {% endif %}
+                                    <div class="hero-rank">{% if hero_filter_name %}Hero{% else %}#{{ loop.index }}{% endif %}</div>
+                                </div>
+                                <div class="hero-stats">
+                                    <div class="hero-stat"><div class="k">Games</div><div class="v">{{ hero.games }}</div></div>
+                                    <div class="hero-stat"><div class="k">Win%</div><div class="v">{{ hero.winrate }}</div></div>
+                                    <div class="hero-stat"><div class="k">KDA</div><div class="v">{{ hero.kda }}</div></div>
+                                    <div class="hero-stat"><div class="k">Time</div><div class="v">{{ hero.time_played }}</div></div>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="muted">No hero stats available.</div>
+                {% endif %}
+            </section>
+        </section>
+    </main>
+</body>
+</html>
